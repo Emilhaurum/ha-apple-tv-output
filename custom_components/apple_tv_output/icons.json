@@ -1,8 +1,34 @@
 {
+  "entity": {
+    "sensor": {
+      "outputs": {
+        "default": "mdi:speaker-wireless"
+      }
+    },
+    "select": {
+      "output": {
+        "default": "mdi:speaker-wireless"
+      }
+    }
+  },
   "services": {
-    "set_output": { "service": "mdi:speaker-wireless" },
-    "add_output": { "service": "mdi:speaker-multiple" },
-    "remove_output": { "service": "mdi:speaker-off" },
-    "get_outputs": { "service": "mdi:format-list-bulleted" }
+    "set_output": {
+      "service": "mdi:speaker-wireless"
+    },
+    "add_output": {
+      "service": "mdi:speaker-multiple"
+    },
+    "remove_output": {
+      "service": "mdi:speaker-off"
+    },
+    "get_outputs": {
+      "service": "mdi:format-list-bulleted"
+    },
+    "get_speakers": {
+      "service": "mdi:speaker-message"
+    },
+    "set_volume": {
+      "service": "mdi:volume-high"
+    }
   }
 }

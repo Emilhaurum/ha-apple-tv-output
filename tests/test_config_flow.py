@@ -30,6 +30,8 @@ async def test_setup_registers_actions(hass: HomeAssistant, mock_async_zeroconf:
         "add_output",
         "remove_output",
         "get_outputs",
+        "get_speakers",
+        "set_volume",
     }
 
 

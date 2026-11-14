@@ -12,10 +12,10 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 import pytest
 
-from custom_components.apple_tv_output import services
+from custom_components.apple_tv_output import speakers as speakers_module
 from custom_components.apple_tv_output.const import CACHE_TTL, DOMAIN
 
-from .conftest import ATV_AIRPLAY_ID, ATV_ENTITY, ATV_NAME, FakeSpeaker, Network, add_apple_tv
+from .conftest import ATV_AIRPLAY_ID, ATV_ENTITY, ATV_NAME, VOLUME, FakeSpeaker, Network, add_apple_tv
 
 LIVING = FakeSpeaker("Living Room", "34:7E:5C:D6:4E:1E")
 KITCHEN = FakeSpeaker("Kitchen", "48:A6:B8:00:00:01")
@@ -114,7 +114,7 @@ async def test_remove_output(hass: HomeAssistant, atv: Any) -> None:
 async def test_get_outputs(hass: HomeAssistant, atv: Any) -> None:
     atv.audio.set_current(("Living Room", LIVING.airplay_id))
     result = await call(hass, "get_outputs")
-    assert result == {ATV_ENTITY: {"outputs": [{"name": "Living Room", "identifier": LIVING.airplay_id}]}}
+    assert result == {ATV_ENTITY: {"outputs": [{"name": "Living Room", "identifier": LIVING.airplay_id, **VOLUME}]}}
 
 
 async def test_speaker_not_found(hass: HomeAssistant, atv: Any) -> None:
@@ -137,7 +137,7 @@ async def test_names_are_cached(
     hass: HomeAssistant, atv: Any, network: Network, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     now = 1000.0
-    monkeypatch.setattr(services.time, "monotonic", lambda: now)
+    monkeypatch.setattr(speakers_module.time, "monotonic", lambda: now)
     await call(hass, "set_output", speakers=["Living Room"])
     await call(hass, "set_output", speakers=["Kitchen"])
     assert network.scans == 1
@@ -335,7 +335,7 @@ async def test_waits_for_late_outputs(
     """The Apple TV reports the new outputs a moment later: no rescan, no warning."""
     await call(hass, "set_output", speakers=["Kitchen"])
     atv.audio.lag = 0.3
-    with patch("custom_components.apple_tv_output.services.OUTPUT_SETTLE_TIME", 2):
+    with patch("custom_components.apple_tv_output.const.OUTPUT_SETTLE_TIME", 2):
         await call(hass, "set_output", speakers=["Living Room"])
     assert network.scans == 1
     assert "did not report" not in caplog.text

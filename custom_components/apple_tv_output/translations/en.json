@@ -3,55 +3,136 @@
     "step": {
       "user": {
         "title": "Apple TV Audio Output",
-        "description": "Adds actions that send an Apple TV's sound to AirPlay speakers. The Apple TV itself must be set up with the Apple TV integration."
+        "description": "Adds actions and entities that send an Apple TV's sound to AirPlay speakers. The Apple TV itself must be set up with the Apple TV integration. Afterwards, select Configure to choose speakers an Apple TV should always play to."
       }
     },
     "abort": {
       "single_instance_allowed": "Already configured. Only a single configuration is possible."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Default speakers",
+        "description": "Choose an Apple TV. Its sound will be sent to the speakers you choose next whenever it wakes up.",
+        "data": {
+          "apple_tv": "Apple TV"
+        }
+      },
+      "speakers": {
+        "title": "Default speakers",
+        "description": "Choose the speakers, or type an AirPlay name or id. Leave it empty to stop sending this Apple TV's sound to default speakers.",
+        "data": {
+          "speakers": "Speakers"
+        }
+      }
+    },
+    "abort": {
+      "no_apple_tvs": "No Apple TV was found. Set up the Apple TV with the Apple TV integration first."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "outputs": {
+        "name": "Audio outputs",
+        "state_attributes": {
+          "outputs": {
+            "name": "Outputs"
+          },
+          "speakers": {
+            "name": "Speakers"
+          }
+        }
+      }
+    },
+    "select": {
+      "output": {
+        "name": "Audio output"
+      }
+    }
+  },
   "services": {
     "set_output": {
       "name": "Set audio output",
-      "description": "Sends the Apple TV's sound to these AirPlay speakers only. Does nothing when they are already the only outputs.",
+      "description": "Sends the Apple TV's sound to these AirPlay speakers only. Does nothing when they are already the only outputs. Can return the outputs before and after the change.",
       "fields": {
         "speakers": {
           "name": "Speakers",
-          "description": "AirPlay speakers: their AirPlay name, a media player entity with the same name, or an AirPlay id."
+          "description": "AirPlay speakers: their AirPlay name, a media player entity of the speaker, or an AirPlay id."
         },
         "force": {
           "name": "Force",
           "description": "Send the command even when the speakers are already an output."
+        },
+        "retries": {
+          "name": "Retries",
+          "description": "How many times to send the command again, a few seconds apart, when a speaker does not become an output. Helps right after the Apple TV wakes up."
+        },
+        "fail_if_not_applied": {
+          "name": "Fail if not applied",
+          "description": "Make the action fail when a speaker does not become an output, instead of only logging a warning."
         }
       }
     },
     "add_output": {
       "name": "Add audio output",
-      "description": "Adds AirPlay speakers to the Apple TV's current audio outputs. Does nothing when they are already an output.",
+      "description": "Adds AirPlay speakers to the Apple TV's current audio outputs. Does nothing when they are already an output. Can return the outputs before and after the change.",
       "fields": {
         "speakers": {
           "name": "Speakers",
-          "description": "AirPlay speakers: their AirPlay name, a media player entity with the same name, or an AirPlay id."
+          "description": "AirPlay speakers: their AirPlay name, a media player entity of the speaker, or an AirPlay id."
         },
         "force": {
           "name": "Force",
           "description": "Send the command even when the speakers are already an output."
+        },
+        "retries": {
+          "name": "Retries",
+          "description": "How many times to send the command again, a few seconds apart, when a speaker does not become an output. Helps right after the Apple TV wakes up."
+        },
+        "fail_if_not_applied": {
+          "name": "Fail if not applied",
+          "description": "Make the action fail when a speaker does not become an output, instead of only logging a warning."
         }
       }
     },
     "remove_output": {
       "name": "Remove audio output",
-      "description": "Removes AirPlay speakers from the Apple TV's audio outputs.",
+      "description": "Removes AirPlay speakers from the Apple TV's audio outputs. Can return the outputs before and after the change.",
       "fields": {
         "speakers": {
           "name": "Speakers",
-          "description": "AirPlay speakers: their AirPlay name, a media player entity with the same name, or an AirPlay id."
+          "description": "AirPlay speakers: their AirPlay name, a media player entity of the speaker, or an AirPlay id."
         }
       }
     },
     "get_outputs": {
       "name": "Get audio outputs",
-      "description": "Returns the Apple TV's current audio outputs."
+      "description": "Returns the Apple TV's current audio outputs, with the volume of each where available."
+    },
+    "get_speakers": {
+      "name": "Get AirPlay speakers",
+      "description": "Returns the AirPlay speakers found on the network, with the names and ids the other actions accept.",
+      "fields": {
+        "rescan": {
+          "name": "Scan again",
+          "description": "Scan the network now instead of using the speakers found recently."
+        }
+      }
+    },
+    "set_volume": {
+      "name": "Set speaker volume",
+      "description": "Sets the volume of one speaker that the Apple TV is playing to.",
+      "fields": {
+        "speaker": {
+          "name": "Speaker",
+          "description": "An AirPlay speaker: its AirPlay name, a media player entity of it, or its AirPlay id."
+        },
+        "volume_level": {
+          "name": "Volume",
+          "description": "The volume, from 0 to 1."
+        }
+      }
     }
   },
   "exceptions": {
@@ -78,6 +159,21 @@
     },
     "command_failed": {
       "message": "Could not change the audio output of {entity_id}: {error}"
+    },
+    "not_applied": {
+      "message": "{entity_id} did not start playing to {speakers}."
+    },
+    "speaker_not_output": {
+      "message": "{name} is not an output of {entity_id}."
+    },
+    "volume_not_supported": {
+      "message": "This version of Home Assistant cannot set the volume of a single speaker. Update Home Assistant to use this action."
+    }
+  },
+  "issues": {
+    "unsupported_version": {
+      "title": "Apple TV Audio Output does not work with this Home Assistant version",
+      "description": "Home Assistant {version} changed the Apple TV integration in a way Apple TV Audio Output does not expect, so it cannot change the audio outputs. Please report this at {url}, and check for an update of Apple TV Audio Output in HACS."
     }
   }
 }
