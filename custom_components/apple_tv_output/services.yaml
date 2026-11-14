@@ -1,0 +1,66 @@
+set_output:
+  fields:
+    entity_id:
+      required: true
+      selector:
+        entity:
+          multiple: true
+          filter:
+            integration: apple_tv
+            domain: media_player
+    speakers:
+      required: true
+      example: '["Living Room", "media_player.kitchen", "34:7E:5C:D6:4E:1E"]'
+      selector:
+        text:
+          multiple: true
+    force:
+      default: false
+      selector:
+        boolean:
+add_output:
+  fields:
+    entity_id:
+      required: true
+      selector:
+        entity:
+          multiple: true
+          filter:
+            integration: apple_tv
+            domain: media_player
+    speakers:
+      required: true
+      example: '["Living Room", "media_player.kitchen", "34:7E:5C:D6:4E:1E"]'
+      selector:
+        text:
+          multiple: true
+    force:
+      default: false
+      selector:
+        boolean:
+remove_output:
+  fields:
+    entity_id:
+      required: true
+      selector:
+        entity:
+          multiple: true
+          filter:
+            integration: apple_tv
+            domain: media_player
+    speakers:
+      required: true
+      example: '["Living Room", "media_player.kitchen", "34:7E:5C:D6:4E:1E"]'
+      selector:
+        text:
+          multiple: true
+get_outputs:
+  fields:
+    entity_id:
+      required: true
+      selector:
+        entity:
+          multiple: true
+          filter:
+            integration: apple_tv
+            domain: media_player

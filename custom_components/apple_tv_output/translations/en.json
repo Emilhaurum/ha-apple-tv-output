@@ -1,0 +1,75 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Apple TV Audio Output",
+        "description": "Adds actions that send an Apple TV's sound to AirPlay speakers. The Apple TV itself must be set up with the Apple TV integration."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Already configured. Only a single configuration is possible."
+    }
+  },
+  "services": {
+    "set_output": {
+      "name": "Set audio output",
+      "description": "Sends the Apple TV's sound to these AirPlay speakers only. Does nothing when they are already an output.",
+      "fields": {
+        "entity_id": {
+          "name": "Apple TV",
+          "description": "The Apple TV's media player."
+        },
+        "speakers": {
+          "name": "Speakers",
+          "description": "AirPlay speakers: their AirPlay name, a media player entity with the same name, or an AirPlay id."
+        },
+        "force": {
+          "name": "Force",
+          "description": "Send the command even when the speakers are already an output."
+        }
+      }
+    },
+    "add_output": {
+      "name": "Add audio output",
+      "description": "Adds AirPlay speakers to the Apple TV's current audio outputs.",
+      "fields": {
+        "entity_id": {
+          "name": "Apple TV",
+          "description": "The Apple TV's media player."
+        },
+        "speakers": {
+          "name": "Speakers",
+          "description": "AirPlay speakers: their AirPlay name, a media player entity with the same name, or an AirPlay id."
+        },
+        "force": {
+          "name": "Force",
+          "description": "Send the command even when the speakers are already an output."
+        }
+      }
+    },
+    "remove_output": {
+      "name": "Remove audio output",
+      "description": "Removes AirPlay speakers from the Apple TV's audio outputs.",
+      "fields": {
+        "entity_id": {
+          "name": "Apple TV",
+          "description": "The Apple TV's media player."
+        },
+        "speakers": {
+          "name": "Speakers",
+          "description": "AirPlay speakers: their AirPlay name, a media player entity with the same name, or an AirPlay id."
+        }
+      }
+    },
+    "get_outputs": {
+      "name": "Get audio outputs",
+      "description": "Returns the Apple TV's current audio outputs.",
+      "fields": {
+        "entity_id": {
+          "name": "Apple TV",
+          "description": "The Apple TV's media player."
+        }
+      }
+    }
+  }
+}

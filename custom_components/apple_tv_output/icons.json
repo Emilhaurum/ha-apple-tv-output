@@ -1,0 +1,8 @@
+{
+  "services": {
+    "set_output": { "service": "mdi:speaker-wireless" },
+    "add_output": { "service": "mdi:speaker-multiple" },
+    "remove_output": { "service": "mdi:speaker-off" },
+    "get_outputs": { "service": "mdi:format-list-bulleted" }
+  }
+}
