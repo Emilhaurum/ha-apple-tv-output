@@ -42,6 +42,13 @@ body:
     validations:
       required: true
   - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: |
+        On the integration's page under Settings → Devices & services, open the menu, select
+        Download diagnostics, and attach the file here. AirPlay ids are left out of it.
+  - type: textarea
     id: logs
     attributes:
       label: Debug log

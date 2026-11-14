@@ -1,5 +1,33 @@
 # Changelog
 
+## [1.2.0]
+
+### Added
+
+- Default speakers: under **Configure**, choose speakers an Apple TV should always play to. Its sound
+  is sent there whenever it wakes up, with no automation needed (#5).
+- A device for each Apple TV with two entities: an **Audio outputs** sensor showing the current
+  outputs (#10), and an **Audio output** dropdown to choose the speaker from a dashboard (#11).
+- `get_speakers` action, which lists the AirPlay speakers found on the network (#7).
+- `set_volume` action, which sets the volume of one output speaker, and the volume of each output in
+  `get_outputs` (Home Assistant 2026.2 and newer) (#12).
+- `retries` field on `set_output` and `add_output`, to try again when a speaker does not become an
+  output, for example right after the Apple TV wakes up (#13).
+- `fail_if_not_applied` field, to make the action fail instead of only logging a warning (#14).
+- `set_output`, `add_output` and `remove_output` can return the outputs before and after the change
+  (#16).
+- A repair notice when a Home Assistant update changes the Apple TV integration in a way this
+  integration does not expect, and a diagnostics download for bug reports (#15).
+- A dashboard button example and a guide for contributing translations in the README (#17, #18).
+
+### Changed
+
+- A speaker given as a media player entity is found by its device's network address when its
+  integration registered one, as Sonos does, so its name no longer has to match the AirPlay name. If
+  the address does not work, the name is tried (#8).
+- The network is scanned for speakers when the integration starts and every hour in the background,
+  so calls by name no longer wait for a scan (#9).
+
 ## [1.1.0]
 
 ### Changed
