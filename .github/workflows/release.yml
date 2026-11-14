@@ -1,10 +1,12 @@
 name: Release
 
-# Push a tag such as v1.1.0 to publish a GitHub release, which HACS offers as an update.
+# Publishes a GitHub release, which HACS offers as an update. Either push a tag such as v1.1.0, or
+# run this workflow by hand on main: it then creates the tag v<manifest version> on main itself.
 on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -15,18 +17,36 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Check that the tag matches the manifest version
+      - name: Check the version
+        id: version
         run: |
           version=$(jq -r .version custom_components/apple_tv_output/manifest.json)
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match manifest version $version"
-            exit 1
+          tag="v$version"
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            if [ "$GITHUB_REF_NAME" != "$tag" ]; then
+              echo "::error::Tag $GITHUB_REF_NAME does not match manifest version $version"
+              exit 1
+            fi
+          else
+            if [ "$GITHUB_REF_NAME" != main ]; then
+              echo "::error::Run this workflow on main, not $GITHUB_REF_NAME"
+              exit 1
+            fi
+            if git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
+              echo "::error::Tag $tag already exists; bump the version in manifest.json first"
+              exit 1
+            fi
           fi
           grep -q "^## \[$version\]" CHANGELOG.md || { echo "::error::CHANGELOG.md has no entry for $version"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
       - name: Extract the release notes
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          version=${GITHUB_REF_NAME#v}
-          awk -v v="$version" '$0 ~ "^## \\[" v "\\]" {on=1; next} /^## \[/ {on=0} on' CHANGELOG.md > notes.md
+          awk -v v="$VERSION" '$0 ~ "^## \\[" v "\\]" {on=1; next} /^## \[/ {on=0} on' CHANGELOG.md > notes.md
       - uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           body_path: notes.md
