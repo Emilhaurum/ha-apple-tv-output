@@ -1,9 +1,18 @@
 {
   "domain": "apple_tv_output",
   "name": "Apple TV Audio Output",
-  "codeowners": ["@Emilhaurum"],
+  "categories": [
+    "media_entertainment.speakers_audio",
+    "media_entertainment.tv_streaming"
+  ],
+  "codeowners": [
+    "@Emilhaurum"
+  ],
   "config_flow": true,
-  "dependencies": ["apple_tv", "zeroconf"],
+  "dependencies": [
+    "apple_tv",
+    "zeroconf"
+  ],
   "documentation": "https://github.com/Emilhaurum/ha-apple-tv-output",
   "integration_type": "service",
   "iot_class": "local_push",
