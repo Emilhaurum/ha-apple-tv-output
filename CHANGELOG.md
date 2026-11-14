@@ -32,6 +32,8 @@
 - Tests, linting and type checking, run in CI against the oldest supported and the newest Home
   Assistant release.
 - A release workflow and Dependabot updates for the GitHub Actions.
+- Ready for the HACS default store: integration categories, a trimmed icon, buttons that open the
+  repository in HACS and start the setup, and issue templates.
 
 ## [1.0.0]
 

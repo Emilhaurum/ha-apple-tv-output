@@ -1,6 +1,9 @@
 # Apple TV Audio Output
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+[![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz)
+[![Release](https://img.shields.io/github/v/release/Emilhaurum/ha-apple-tv-output)](https://github.com/Emilhaurum/ha-apple-tv-output/releases)
+[![Validate](https://github.com/Emilhaurum/ha-apple-tv-output/actions/workflows/validate.yml/badge.svg)](https://github.com/Emilhaurum/ha-apple-tv-output/actions/workflows/validate.yml)
+[![License](https://img.shields.io/github/license/Emilhaurum/ha-apple-tv-output)](LICENSE)
 
 A Home Assistant integration that sends an Apple TV's sound to AirPlay 2 speakers. It is tested with
 an Apple TV 4K and Sonos speakers on Home Assistant 2026.11.
@@ -23,9 +26,12 @@ an automation can pick the speaker every time the Apple TV wakes up.
 
 ### HACS
 
-1. In HACS, open the menu and choose **Custom repositories**.
-2. Add `https://github.com/Emilhaurum/ha-apple-tv-output` with the type **Integration**.
-3. Install **Apple TV Audio Output** and restart Home Assistant.
+[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Emilhaurum&repository=ha-apple-tv-output&category=integration)
+
+1. Select the button above to open the repository in HACS, or search for **Apple TV Audio Output**
+   in HACS. If HACS does not find it, open the menu, choose **Custom repositories**, and add
+   `https://github.com/Emilhaurum/ha-apple-tv-output` with the type **Integration**.
+2. Select **Download**, and restart Home Assistant.
 
 ### Manual
 
@@ -34,8 +40,13 @@ configuration and restart Home Assistant.
 
 ### Set up
 
-Go to **Settings → Devices & services → Add integration** and add **Apple TV Audio Output**. There
-is nothing to configure; adding it makes the actions available.
+[![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=apple_tv_output)
+
+Select the button above, or go to **Settings → Devices & services → Add integration** and add
+**Apple TV Audio Output**. There is nothing to configure; adding it makes the actions available.
+
+The integration's icon shows in Home Assistant 2026.3 and newer, which can show icons that come with
+a custom integration.
 
 ## Actions
 

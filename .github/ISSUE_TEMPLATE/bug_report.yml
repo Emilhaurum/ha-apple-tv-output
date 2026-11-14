@@ -1,0 +1,51 @@
+name: Bug report
+description: Something does not work as described.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please check the [troubleshooting section](https://github.com/Emilhaurum/ha-apple-tv-output#troubleshooting) first.
+        Most problems where the Apple TV shows "Could not connect" are network problems between the Apple TV and the speaker.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: action
+    attributes:
+      label: Action call
+      description: The action call or automation, in YAML.
+      render: yaml
+  - type: input
+    id: integration-version
+    attributes:
+      label: Integration version
+      placeholder: "1.1.0"
+    validations:
+      required: true
+  - type: input
+    id: ha-version
+    attributes:
+      label: Home Assistant version
+      placeholder: "2026.11.1"
+    validations:
+      required: true
+  - type: input
+    id: devices
+    attributes:
+      label: Apple TV model and tvOS version, and the speakers
+      placeholder: "Apple TV 4K (3rd generation), tvOS 26.1, Sonos Era 100"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Debug log
+      description: |
+        Turn on debug logging on the integration's page under Settings → Devices & services, repeat the
+        action, then turn it off again and paste the log lines that mention `apple_tv_output`.
+      render: text
