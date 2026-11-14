@@ -16,3 +16,6 @@ SCAN_TIMEOUT = 4
 
 # How long the speakers found by a scan are trusted before the next lookup by name scans again.
 CACHE_TTL = 3600
+
+# How long to wait, after a command, for the Apple TV to report the new outputs, in seconds.
+OUTPUT_SETTLE_TIME = 2.0

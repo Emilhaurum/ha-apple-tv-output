@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 from types import SimpleNamespace
 from typing import Any
@@ -26,6 +27,13 @@ ATV_AIRPLAY_ID = "AA:BB:CC:DD:EE:FF"
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(enable_custom_integrations: None) -> None:
     """Load the integration from custom_components."""
+
+
+@pytest.fixture(autouse=True)
+def no_settle_time():
+    """Do not wait for outputs that will never come, unless a test asks for it."""
+    with patch("custom_components.apple_tv_output.services.OUTPUT_SETTLE_TIME", 0):
+        yield
 
 
 @dataclass
@@ -56,6 +64,8 @@ class Network:
 
     speakers: list[FakeSpeaker] = field(default_factory=list)
     scans: int = 0
+    scan_delay: float = 0
+    scan_error: Exception | None = None
 
     def add(self, *speakers: FakeSpeaker) -> None:
         self.speakers.extend(speakers)
@@ -72,6 +82,14 @@ class FakeAudio:
         self.output_devices: list[OutputDevice] = []
         self.calls: list[tuple[str, tuple[str, ...]]] = []
         self.fail: Exception | None = None
+        # Seconds before a change shows up in output_devices, as on a real Apple TV.
+        self.lag: float = 0
+
+    def _apply(self, devices: list[OutputDevice]) -> None:
+        if self.lag:
+            asyncio.get_running_loop().call_later(self.lag, setattr, self, "output_devices", devices)
+        else:
+            self.output_devices = devices
 
     def _devices(self, ids: tuple[str, ...]) -> list[OutputDevice]:
         found = [self.network.by_id(i) for i in ids]
@@ -81,20 +99,20 @@ class FakeAudio:
         self.calls.append(("set", ids))
         if self.fail:
             raise self.fail
-        self.output_devices = self._devices(ids)
+        self._apply(self._devices(ids))
 
     async def add_output_devices(self, *ids: str) -> None:
         self.calls.append(("add", ids))
         if self.fail:
             raise self.fail
         current = {d.identifier for d in self.output_devices}
-        self.output_devices += [d for d in self._devices(ids) if d.identifier not in current]
+        self._apply(self.output_devices + [d for d in self._devices(ids) if d.identifier not in current])
 
     async def remove_output_devices(self, *ids: str) -> None:
         self.calls.append(("remove", ids))
         if self.fail:
             raise self.fail
-        self.output_devices = [d for d in self.output_devices if d.identifier not in ids]
+        self._apply([d for d in self.output_devices if d.identifier not in ids])
 
     def set_current(self, *devices: tuple[str, str]) -> None:
         self.output_devices = [OutputDevice(name=n, identifier=i) for n, i in devices]
@@ -111,6 +129,9 @@ def mock_scan(network: Network):
 
     async def scan(*args: Any, **kwargs: Any) -> list[Any]:
         network.scans += 1
+        await asyncio.sleep(network.scan_delay)
+        if network.scan_error:
+            raise network.scan_error
         return [s.conf() for s in network.speakers]
 
     with (

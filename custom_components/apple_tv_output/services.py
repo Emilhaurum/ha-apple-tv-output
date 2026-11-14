@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 import logging
 import re
@@ -10,10 +11,10 @@ from typing import Any
 
 from homeassistant.components import zeroconf
 from homeassistant.components.media_player import DATA_COMPONENT, DOMAIN as MEDIA_PLAYER_DOMAIN
-from homeassistant.const import __version__ as HA_VERSION
+from homeassistant.const import ATTR_ENTITY_ID, ENTITY_MATCH_ALL, __version__ as HA_VERSION
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
-from homeassistant.helpers import config_validation as cv, entity_registry as er
+from homeassistant.helpers import config_validation as cv, device_registry as dr, entity_registry as er
 from homeassistant.util.hass_dict import HassKey
 from homeassistant.util.json import JsonValueType
 import voluptuous as vol
@@ -24,6 +25,7 @@ from .const import (
     ATTR_SPEAKERS,
     CACHE_TTL,
     DOMAIN,
+    OUTPUT_SETTLE_TIME,
     SCAN_TIMEOUT,
     SERVICE_ADD_OUTPUT,
     SERVICE_GET_OUTPUTS,
@@ -70,6 +72,8 @@ class _Cache:
 
     devices: dict[str, list[_Device]] = field(default_factory=dict)
     scanned_at: float | None = None
+    # Only one scan at a time; calls that wait for it use its result.
+    lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
     @property
     def expired(self) -> bool:
@@ -166,26 +170,45 @@ def _apple_tv(hass: HomeAssistant, entity_id: str) -> _AppleTV:
     )
 
 
+def _is_apple_tv_player(hass: HomeAssistant, entry: er.RegistryEntry | None) -> bool:
+    """Return whether a registry entry is the media player of an Apple TV (not of a HomePod)."""
+    if entry is None or entry.platform != APPLE_TV_DOMAIN or entry.domain != MEDIA_PLAYER_DOMAIN:
+        return False
+    device = dr.async_get(hass).async_get(entry.device_id) if entry.device_id else None
+    return "homepod" not in (getattr(device, "model", None) or "").casefold()
+
+
 def _targets(hass: HomeAssistant, call: ServiceCall) -> list[_AppleTV]:
     """Return the Apple TVs a call targets.
 
-    An entity named directly must be an Apple TV; of the entities an area or device brings in, the
-    Apple TV media players are kept and the rest ignored.
+    An entity named directly must be a connected Apple TV. Of the entities an area, a device or
+    `all` brings in, the Apple TV media players are used, and those that cannot be are skipped.
     """
-    if TargetSelection is not None:
-        selected = async_extract_referenced_entity_ids(hass, TargetSelection(call.data))
-    else:
-        selected = _legacy_extract(hass, call)
     registry = er.async_get(hass)
-    entity_ids = set(selected.referenced)
-    for entity_id in selected.indirectly_referenced:
-        entry = registry.async_get(entity_id)
-        if entry and entry.platform == APPLE_TV_DOMAIN and entry.domain == MEDIA_PLAYER_DOMAIN:
-            entity_ids.add(entity_id)
-    if not entity_ids:
-        raise _error(ServiceValidationError, "no_apple_tv")
+    if call.data.get(ATTR_ENTITY_ID) == ENTITY_MATCH_ALL:
+        direct: set[str] = set()
+        indirect = set(registry.entities)
+    else:
+        if TargetSelection is not None:
+            selected = async_extract_referenced_entity_ids(hass, TargetSelection(call.data))
+        else:
+            selected = _legacy_extract(hass, call)
+        direct = set(selected.referenced)
+        indirect = set(selected.indirectly_referenced) - direct
+    indirect = {entity_id for entity_id in indirect if _is_apple_tv_player(hass, registry.async_get(entity_id))}
+
     # Check every Apple TV before changing any, so a bad target cannot leave a half-done change.
-    return [_apple_tv(hass, entity_id) for entity_id in sorted(entity_ids)]
+    apple_tvs = [_apple_tv(hass, entity_id) for entity_id in sorted(direct)]
+    skipped: list[HomeAssistantError] = []
+    for entity_id in sorted(indirect):
+        try:
+            apple_tvs.append(_apple_tv(hass, entity_id))
+        except HomeAssistantError as err:
+            _LOGGER.debug("Skipping %s: %s", entity_id, err)
+            skipped.append(err)
+    if not apple_tvs:
+        raise skipped[0] if skipped else _error(ServiceValidationError, "no_apple_tv")
+    return apple_tvs
 
 
 async def _scan(hass: HomeAssistant, cache: _Cache) -> None:
@@ -211,6 +234,14 @@ async def _scan(hass: HomeAssistant, cache: _Cache) -> None:
         same_name = devices.setdefault(conf.name.casefold(), [])
         if not any(d.keys & keys for d in same_name):
             same_name.append(_Device(conf.name, identifier, keys))
+
+    # A speaker can miss a scan (asleep, slow to answer): keep what earlier scans found, unless the
+    # speaker was found again (perhaps renamed) or its name now belongs to a speaker just found.
+    seen = frozenset().union(*(d.keys for ds in devices.values() for d in ds))
+    for name, old in cache.devices.items():
+        for device in old:
+            if not device.keys & seen and name not in devices:
+                devices.setdefault(name, []).append(device)
     cache.devices = devices
     cache.scanned_at = time.monotonic()
     _LOGGER.debug("Found AirPlay speakers: %s", devices)
@@ -232,7 +263,11 @@ async def _resolve(hass: HomeAssistant, speakers: list[str], *, rescan: bool = F
     if rescan or any(
         not _is_id(name) and (cache.expired or name.casefold() not in cache.devices) for _, name in wanted
     ):
-        await _scan(hass, cache)
+        started = cache.scanned_at
+        async with cache.lock:
+            # Another call may have scanned while this one waited; its result is just as fresh.
+            if cache.scanned_at == started:
+                await _scan(hass, cache)
         scanned = True
 
     known = {key: device for ds in cache.devices.values() for device in ds for key in device.keys}
@@ -240,9 +275,11 @@ async def _resolve(hass: HomeAssistant, speakers: list[str], *, rescan: bool = F
     for speaker, name in wanted:
         if _is_id(name):
             identifier = _canonical(name)
-            device = known.get(_key(identifier))
-            keys = frozenset({_key(identifier)} | (device.keys if device else set()))
-            result.append(_Speaker(speaker, _Device(device.name if device else name, identifier, keys)))
+            if (device := known.get(_key(identifier))) is not None:
+                # Any of a speaker's ids may have been given (an MRP id, say): send its AirPlay id.
+                result.append(_Speaker(speaker, device))
+            else:
+                result.append(_Speaker(speaker, _Device(name, identifier, frozenset({_key(identifier)}))))
             continue
         matches = cache.devices.get(name.casefold(), [])
         source = "" if speaker.strip() == name else f" (from {speaker.strip()})"
@@ -308,21 +345,24 @@ async def _modify(hass: HomeAssistant, call: ServiceCall, tv: _AppleTV, speakers
     method = audio.add_output_devices if call.service == SERVICE_ADD_OUTPUT else audio.set_output_devices
     await _send(tv, method, [s.device.identifier for s in speakers])
 
-    if _missing(tv, speakers) and any(s.from_cache for s in speakers):
+    if await _missing(tv, speakers) and any(s.from_cache for s in speakers):
         # A speaker may have changed since the last scan (renamed, or a new id): look again, and if any
         # name now leads to another speaker, send the command once more.
         _LOGGER.debug("Not all speakers became an output of %s; scanning again", tv.entity_id)
         try:
             fresh = await _resolve(hass, [s.requested for s in speakers], rescan=True)
-        except ServiceValidationError as err:
-            # The command has been sent; a speaker the new scan cannot place is reported below.
+        except Exception as err:
+            # The command has been sent; whatever the new scan could not place is reported below.
             _LOGGER.debug("Scanning again did not help: %s", err)
         else:
-            if [s.device.identifier for s in fresh] != [s.device.identifier for s in speakers]:
-                await _send(tv, method, [s.device.identifier for s in fresh])
+            changed = [new for new, old in zip(fresh, speakers, strict=True) if new.device != old.device]
+            if changed:
+                # add_output resends only the changed speakers, not to interrupt those already added.
+                again = changed if call.service == SERVICE_ADD_OUTPUT else fresh
+                await _send(tv, method, [s.device.identifier for s in again])
             speakers = fresh
 
-    if missing := _missing(tv, speakers):
+    if missing := await _missing(tv, speakers):
         _LOGGER.warning(
             "%s did not report %s as an output. If the Apple TV shows 'Could not connect', it cannot reach "
             "the speaker over AirPlay; see the troubleshooting section of the documentation",
@@ -333,9 +373,16 @@ async def _modify(hass: HomeAssistant, call: ServiceCall, tv: _AppleTV, speakers
     return speakers
 
 
-def _missing(tv: _AppleTV, speakers: list[_Speaker]) -> list[_Speaker]:
-    current = _current(tv.atv)
-    return [s for s in speakers if not s.device.keys & current.keys()]
+async def _missing(tv: _AppleTV, speakers: list[_Speaker]) -> list[_Speaker]:
+    """Return the speakers that are not an output, giving the Apple TV a moment to report them."""
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + OUTPUT_SETTLE_TIME
+    while True:
+        current = _current(tv.atv)
+        missing = [s for s in speakers if not s.device.keys & current.keys()]
+        if not missing or loop.time() >= deadline:
+            return missing
+        await asyncio.sleep(0.25)
 
 
 @callback

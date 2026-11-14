@@ -39,8 +39,10 @@ is nothing to configure; adding it makes the actions available.
 
 ## Actions
 
-Every action targets one or more Apple TVs. Pick their media player entities, or a device or area:
-of the entities a device or area brings in, only the Apple TV media players are used.
+Every action targets one or more Apple TVs. Pick their media player entities, a device, an area or
+`all`. Of the entities a device, an area or `all` brings in, only the media players of Apple TVs that
+are connected are used: other entities, HomePods and Apple TVs that are off are skipped. An entity
+picked by name must be a connected Apple TV.
 
 | Action | What it does |
 | --- | --- |
@@ -57,11 +59,14 @@ of the entities a device or area brings in, only the Apple TV media players are 
 - the speaker's AirPlay id (`34:7E:5C:D6:4E:1E`). It can also be written in lower case, with dashes
   or with nothing between the pairs of digits.
 
-Names are looked up with a network scan, which takes a few seconds. What the scan finds is kept for
-an hour, and a name it did not find is looked up with a new scan right away. If a speaker given by
+Names are looked up with a network scan, which takes a few seconds. A name that is not known yet is
+looked up with a new scan right away, and after an hour the next lookup by name scans again. A
+speaker that misses a scan (asleep, say) is still remembered from earlier ones. If a speaker given by
 name does not become an output, the integration scans again, in case the speaker has changed, and
-sends the command once more if the name now leads to another speaker. An id needs no scan;
-`get_outputs` shows the id of every speaker that is currently an output.
+resends the command for the speakers whose name now leads to another speaker. An id needs no scan;
+`get_outputs` shows the id of every speaker that is currently an output. Any of a speaker's ids can
+be used, such as the one Home Assistant shows for a HomePod: if a scan has found the speaker, its
+AirPlay id is sent.
 
 Calling an action again does not interrupt the sound:
 

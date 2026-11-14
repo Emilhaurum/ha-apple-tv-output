@@ -47,7 +47,8 @@ jobs:
           # The oldest Home Assistant the integration supports (hacs.json).
           - name: HA 2025.1
             python: "3.13"
-            packages: pytest-homeassistant-custom-component==0.13.205 pyatv==0.16.0
+            # This release pins a beta of one of its dependencies.
+            packages: --prerelease=allow pytest-homeassistant-custom-component==0.13.205 pyatv==0.16.0
           # The newest Home Assistant release.
           - name: latest HA
             python: "3.14"
@@ -58,7 +59,7 @@ jobs:
       - run: |
           uv venv --python ${{ matrix.python }}
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
-      - run: uv pip install --prerelease=allow ${{ matrix.packages }}
+      - run: uv pip install ${{ matrix.packages }}
       - run: python -m pytest -p no:sugar
       - if: contains(matrix.packages, 'mypy')
         run: python -m mypy
