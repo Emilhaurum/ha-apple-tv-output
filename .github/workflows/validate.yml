@@ -7,20 +7,59 @@ on:
     - cron: "0 4 * * 1"
   workflow_dispatch:
 
-permissions: {}
+permissions:
+  contents: read
 
 jobs:
   hassfest:
     name: Hassfest
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: home-assistant/actions/hassfest@master
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # This action has no maintained tags: pinned to a commit of master.
+      - uses: home-assistant/actions/hassfest@86d4564712fa02543c808e3a693dd04f9d3f8361 # master
 
   hacs:
     name: HACS
     runs-on: ubuntu-latest
     steps:
-      - uses: hacs/action@main
+      # This action has no maintained tags: pinned to a commit of main.
+      - uses: hacs/action@1ebf01c408f29afcb6406bd431bc98fd8cbb15aa # main
         with:
           category: integration
+
+  lint:
+    name: Ruff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - run: uvx ruff check --output-format=github .
+      - run: uvx ruff format --check .
+
+  test:
+    name: Tests (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The oldest Home Assistant the integration supports (hacs.json).
+          - name: HA 2025.1
+            python: "3.13"
+            # This release pins a beta of one of its dependencies.
+            packages: --prerelease=allow pytest-homeassistant-custom-component==0.13.205 pyatv==0.16.0
+          # The newest Home Assistant release.
+          - name: latest HA
+            python: "3.14"
+            packages: pytest-homeassistant-custom-component pyatv mypy
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - run: |
+          uv venv --python ${{ matrix.python }}
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      - run: uv pip install ${{ matrix.packages }}
+      - run: python -m pytest -p no:sugar
+      - if: contains(matrix.packages, 'mypy')
+        run: python -m mypy

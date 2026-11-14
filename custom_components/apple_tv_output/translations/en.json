@@ -13,12 +13,8 @@
   "services": {
     "set_output": {
       "name": "Set audio output",
-      "description": "Sends the Apple TV's sound to these AirPlay speakers only. Does nothing when they are already an output.",
+      "description": "Sends the Apple TV's sound to these AirPlay speakers only. Does nothing when they are already the only outputs.",
       "fields": {
-        "entity_id": {
-          "name": "Apple TV",
-          "description": "The Apple TV's media player."
-        },
         "speakers": {
           "name": "Speakers",
           "description": "AirPlay speakers: their AirPlay name, a media player entity with the same name, or an AirPlay id."
@@ -31,12 +27,8 @@
     },
     "add_output": {
       "name": "Add audio output",
-      "description": "Adds AirPlay speakers to the Apple TV's current audio outputs.",
+      "description": "Adds AirPlay speakers to the Apple TV's current audio outputs. Does nothing when they are already an output.",
       "fields": {
-        "entity_id": {
-          "name": "Apple TV",
-          "description": "The Apple TV's media player."
-        },
         "speakers": {
           "name": "Speakers",
           "description": "AirPlay speakers: their AirPlay name, a media player entity with the same name, or an AirPlay id."
@@ -51,10 +43,6 @@
       "name": "Remove audio output",
       "description": "Removes AirPlay speakers from the Apple TV's audio outputs.",
       "fields": {
-        "entity_id": {
-          "name": "Apple TV",
-          "description": "The Apple TV's media player."
-        },
         "speakers": {
           "name": "Speakers",
           "description": "AirPlay speakers: their AirPlay name, a media player entity with the same name, or an AirPlay id."
@@ -63,13 +51,33 @@
     },
     "get_outputs": {
       "name": "Get audio outputs",
-      "description": "Returns the Apple TV's current audio outputs.",
-      "fields": {
-        "entity_id": {
-          "name": "Apple TV",
-          "description": "The Apple TV's media player."
-        }
-      }
+      "description": "Returns the Apple TV's current audio outputs."
+    }
+  },
+  "exceptions": {
+    "no_apple_tv": {
+      "message": "The action did not target any Apple TV media player."
+    },
+    "not_apple_tv": {
+      "message": "{entity_id} is not an Apple TV media player."
+    },
+    "not_connected": {
+      "message": "{entity_id} is not connected."
+    },
+    "unsupported_version": {
+      "message": "The Apple TV integration in Home Assistant {version} works differently from what Apple TV Audio Output expects. Please report this as an issue."
+    },
+    "unknown_speaker_entity": {
+      "message": "Unknown speaker entity {entity_id}."
+    },
+    "speaker_not_found": {
+      "message": "No AirPlay speaker named \"{name}\"{source} was found. Found: {found}."
+    },
+    "speaker_ambiguous": {
+      "message": "More than one AirPlay speaker is named \"{name}\"{source}. Use the AirPlay id of the one you mean: {ids}."
+    },
+    "command_failed": {
+      "message": "Could not change the audio output of {entity_id}: {error}"
     }
   }
 }

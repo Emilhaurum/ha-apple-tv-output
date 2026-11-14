@@ -1,13 +1,9 @@
 set_output:
+  target:
+    entity:
+      integration: apple_tv
+      domain: media_player
   fields:
-    entity_id:
-      required: true
-      selector:
-        entity:
-          multiple: true
-          filter:
-            integration: apple_tv
-            domain: media_player
     speakers:
       required: true
       example: '["Living Room", "media_player.kitchen", "34:7E:5C:D6:4E:1E"]'
@@ -19,15 +15,11 @@ set_output:
       selector:
         boolean:
 add_output:
+  target:
+    entity:
+      integration: apple_tv
+      domain: media_player
   fields:
-    entity_id:
-      required: true
-      selector:
-        entity:
-          multiple: true
-          filter:
-            integration: apple_tv
-            domain: media_player
     speakers:
       required: true
       example: '["Living Room", "media_player.kitchen", "34:7E:5C:D6:4E:1E"]'
@@ -39,15 +31,11 @@ add_output:
       selector:
         boolean:
 remove_output:
+  target:
+    entity:
+      integration: apple_tv
+      domain: media_player
   fields:
-    entity_id:
-      required: true
-      selector:
-        entity:
-          multiple: true
-          filter:
-            integration: apple_tv
-            domain: media_player
     speakers:
       required: true
       example: '["Living Room", "media_player.kitchen", "34:7E:5C:D6:4E:1E"]'
@@ -55,12 +43,7 @@ remove_output:
         text:
           multiple: true
 get_outputs:
-  fields:
-    entity_id:
-      required: true
-      selector:
-        entity:
-          multiple: true
-          filter:
-            integration: apple_tv
-            domain: media_player
+  target:
+    entity:
+      integration: apple_tv
+      domain: media_player

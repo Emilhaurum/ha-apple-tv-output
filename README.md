@@ -39,7 +39,10 @@ is nothing to configure; adding it makes the actions available.
 
 ## Actions
 
-Every action takes `entity_id`: the media player of one or more Apple TVs.
+Every action targets one or more Apple TVs. Pick their media player entities, a device, an area or
+`all`. Of the entities a device, an area or `all` brings in, only the media players of Apple TVs that
+are connected are used: other entities, HomePods and Apple TVs that are off are skipped. An entity
+picked by name must be a connected Apple TV.
 
 | Action | What it does |
 | --- | --- |
@@ -50,16 +53,29 @@ Every action takes `entity_id`: the media player of one or more Apple TVs.
 
 `speakers` is a list. Each item can be:
 
-- the speaker's AirPlay name, as shown in the Apple TV's audio menu (`Living Room`);
+- the speaker's AirPlay name, as shown in the Apple TV's audio menu (`Living Room`). Upper and
+  lower case do not matter;
 - a media player entity whose name is the same as the AirPlay name (`media_player.living_room`);
-- the speaker's AirPlay id (`34:7E:5C:D6:4E:1E`).
+- the speaker's AirPlay id (`34:7E:5C:D6:4E:1E`). It can also be written in lower case, with dashes
+  or with nothing between the pairs of digits.
 
-Names are looked up with a network scan the first time they are used, which takes a few seconds.
-The result is kept until Home Assistant restarts. An id needs no scan; `get_outputs` shows the id of
-every speaker that is currently an output.
+Names are looked up with a network scan, which takes a few seconds. A name that is not known yet is
+looked up with a new scan right away, and after an hour the next lookup by name scans again. A
+speaker that misses a scan (asleep, say) is still remembered from earlier ones. If a speaker given by
+name does not become an output, the integration scans again, in case the speaker has changed, and
+resends the command for the speakers whose name now leads to another speaker. An id needs no scan;
+`get_outputs` shows the id of every speaker that is currently an output. Any of a speaker's ids can
+be used, such as the one Home Assistant shows for a HomePod: if a scan has found the speaker, its
+AirPlay id is sent.
 
-`set_output` and `add_output` do nothing when all the given speakers are already an output, so
-calling them again does not interrupt the sound. Set `force: true` to send the command anyway.
+Calling an action again does not interrupt the sound:
+
+- `set_output` does nothing when the given speakers are already the only outputs. If any other
+  speaker is also playing, the command is sent, and that speaker is dropped.
+- `add_output` does nothing when all the given speakers are already an output.
+- `remove_output` does nothing when none of the given speakers is an output.
+
+Set `force: true` on `set_output` or `add_output` to send the command anyway.
 
 ### Example: always play through a Sonos speaker
 
@@ -75,8 +91,9 @@ automation:
           - idle
     actions:
       - action: apple_tv_output.set_output
-        data:
+        target:
           entity_id: media_player.apple_tv
+        data:
           speakers:
             - Living Room
 ```
@@ -85,7 +102,7 @@ automation:
 
 ```yaml
 action: apple_tv_output.get_outputs
-data:
+target:
   entity_id: media_player.apple_tv
 response_variable: result
 ```
@@ -113,6 +130,20 @@ network.
 those, or use the speaker's AirPlay id. Home Assistant must be able to discover the speaker (mDNS)
 for names to work.
 
+**"More than one AirPlay speaker is named …".** Two speakers share the name. The error lists their
+AirPlay ids: use the id of the one you mean, or rename one of the speakers.
+
+**"… did not report … as an output" in the log.** The command was sent, but the Apple TV did not
+start playing to the speaker. This is usually the network problem described above.
+
+**"The Apple TV integration in Home Assistant … works differently".** A Home Assistant update has
+changed the Apple TV integration's internals (see below). Please open an issue and say which Home
+Assistant version you run.
+
+To see what the integration does, turn on debug logging for it on its page under **Settings →
+Devices & services**. The log then shows the speakers each scan finds and the outputs after each
+change.
+
 ## How it works
 
 The Apple TV integration is built on [pyatv](https://pyatv.dev), which can change the output
@@ -120,6 +151,31 @@ devices of an Apple TV but is not exposed as an action in Home Assistant. This i
 the pyatv connection that the Apple TV integration already holds and calls it. It relies on
 internals of that integration, so a future Home Assistant release could break it; please open an
 issue if it does.
+
+## Known limitations
+
+- It relies on internals of Home Assistant's Apple TV integration (see above). The tests are run
+  against the oldest supported and the newest Home Assistant release every week, but a new release
+  can still break it.
+- Speaker names need mDNS discovery from Home Assistant. Where that does not work, use AirPlay ids.
+- Two speakers with the same name cannot be told apart by name; use their ids.
+- The Apple TV itself can show up in its own list of outputs. It is ignored when `set_output`
+  checks whether the given speakers are already the only outputs.
+
+## Development
+
+```sh
+python -m venv .venv && . .venv/bin/activate
+pip install pytest-homeassistant-custom-component pyatv ruff mypy
+pytest           # tests
+ruff check .     # lint
+ruff format .    # format
+mypy             # type check
+```
+
+To release, set `version` in `manifest.json`, add a section for it to `CHANGELOG.md`, and push a tag
+named `v` followed by the version (`v1.1.0`). The release workflow checks that the three match and
+publishes a GitHub release, which HACS then offers as an update.
 
 ## License
 
