@@ -184,9 +184,10 @@ ruff format .    # format
 mypy             # type check
 ```
 
-To release, set `version` in `manifest.json`, add a section for it to `CHANGELOG.md`, and push a tag
-named `v` followed by the version (`v1.1.0`). The release workflow checks that the three match and
-publishes a GitHub release, which HACS then offers as an update.
+To release, set `version` in `manifest.json` and add a section for it to `CHANGELOG.md`. Then either
+run the **Release** workflow on `main` from the Actions tab, which creates the tag itself, or push a
+tag named `v` followed by the version (`v1.1.0`). The workflow checks that the version, the tag and
+the changelog match, and publishes a GitHub release, which HACS then offers as an update.
 
 ## License
 
