@@ -32,8 +32,10 @@ def outputs(atv: Any) -> list[dict[str, Any]]:
     result = []
     for device in atv.audio.output_devices:
         item: dict[str, Any] = {"name": device.name, "identifier": device.identifier}
-        # pyatv reports volume as 0-100; Home Assistant uses 0-1. Older pyatv has no volume per output.
-        if (volume := getattr(device, "volume", None)) is not None:
+        # pyatv reports volume as 0-100; Home Assistant uses 0-1. Older pyatv has no volume per output, and
+        # newer pyatv reads 0 until the Apple TV reports a speaker's volume, which it does only after a change.
+        # A real 0 cannot be told from "not reported yet", so 0 is left out rather than shown as muted.
+        if volume := getattr(device, "volume", None):
             item["volume_level"] = round(volume / 100, 2)
         result.append(item)
     return result

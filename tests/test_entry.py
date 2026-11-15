@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from datetime import timedelta
+import json
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import patch
@@ -20,7 +22,7 @@ from custom_components.apple_tv_output import defaults
 from custom_components.apple_tv_output.const import CONF_DEFAULT_SPEAKERS
 from custom_components.apple_tv_output.diagnostics import async_get_config_entry_diagnostics
 
-from .conftest import ATV_ENTITY, ATV_NAME, VOLUME, FakeSpeaker, Network, add_apple_tv
+from .conftest import ATV_ENTITY, ATV_NAME, FakeSpeaker, Network, add_apple_tv
 
 LIVING = FakeSpeaker("Living Room", "34:7E:5C:D6:4E:1E")
 KITCHEN = FakeSpeaker("Kitchen", "48:A6:B8:00:00:01")
@@ -278,9 +280,12 @@ async def test_diagnostics(hass: HomeAssistant, atv: Any, setup_integration: Any
     data = await async_get_config_entry_diagnostics(hass, entry)
     assert data["default_speakers"] == {ATV_ENTITY: ["Kitchen", "**REDACTED**"]}
     assert data["apple_tvs"][0]["connected"] is True
-    assert data["apple_tvs"][0]["outputs"][0] == {"name": "Living Room", "identifier": "**REDACTED**", **VOLUME}
+    assert data["apple_tvs"][0]["outputs"][0] == {"name": "Living Room", "identifier": "**REDACTED**"}
     assert {"name": "Kitchen", "identifier": "**REDACTED**"} in data["speakers_found"]
-    assert data["versions"]["integration"] == "1.2.0"
+    manifest = json.loads(
+        (Path(__file__).parent.parent / "custom_components/apple_tv_output/manifest.json").read_text()
+    )
+    assert data["versions"]["integration"] == manifest["version"]
 
 
 async def test_default_speakers_no_wait_on_unsupported_version(

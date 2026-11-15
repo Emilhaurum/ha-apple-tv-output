@@ -15,7 +15,7 @@ import pytest
 from custom_components.apple_tv_output import speakers as speakers_module
 from custom_components.apple_tv_output.const import CACHE_TTL, DOMAIN
 
-from .conftest import ATV_AIRPLAY_ID, ATV_ENTITY, ATV_NAME, VOLUME, FakeSpeaker, Network, add_apple_tv
+from .conftest import ATV_AIRPLAY_ID, ATV_ENTITY, ATV_NAME, FakeSpeaker, Network, add_apple_tv
 
 LIVING = FakeSpeaker("Living Room", "34:7E:5C:D6:4E:1E")
 KITCHEN = FakeSpeaker("Kitchen", "48:A6:B8:00:00:01")
@@ -114,7 +114,7 @@ async def test_remove_output(hass: HomeAssistant, atv: Any) -> None:
 async def test_get_outputs(hass: HomeAssistant, atv: Any) -> None:
     atv.audio.set_current(("Living Room", LIVING.airplay_id))
     result = await call(hass, "get_outputs")
-    assert result == {ATV_ENTITY: {"outputs": [{"name": "Living Room", "identifier": LIVING.airplay_id, **VOLUME}]}}
+    assert result == {ATV_ENTITY: {"outputs": [{"name": "Living Room", "identifier": LIVING.airplay_id}]}}
 
 
 async def test_speaker_not_found(hass: HomeAssistant, atv: Any) -> None:

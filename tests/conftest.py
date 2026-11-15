@@ -21,7 +21,7 @@ from custom_components.apple_tv_output.services import async_setup_services
 
 ATV_ENTITY = "media_player.living_room_tv"
 # Older pyatv (Home Assistant 2025.1) has no volume per output.
-VOLUME: dict[str, float] = {"volume_level": 0.0} if hasattr(OutputDevice(name="x", identifier="x"), "volume") else {}
+HAS_VOLUME = hasattr(OutputDevice(name="x", identifier="x"), "volume")
 ATV_NAME = "Living Room TV"
 ATV_MRP_ID = "11111111-2222-3333-4444-555555555555"
 ATV_AIRPLAY_ID = "AA:BB:CC:DD:EE:FF"

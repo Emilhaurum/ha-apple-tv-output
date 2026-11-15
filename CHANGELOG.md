@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.1]
+
+### Fixed
+
+- A speaker's volume showed as 0 in `get_outputs`, the Audio outputs sensor and diagnostics until it
+  had been changed, because the Apple TV only reports a speaker's volume after a change. The volume is
+  now left out until it has been reported.
+
 ## [1.2.0]
 
 ### Added
