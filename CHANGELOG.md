@@ -18,7 +18,8 @@
   (#16).
 - A repair notice when a Home Assistant update changes the Apple TV integration in a way this
   integration does not expect, and a diagnostics download for bug reports (#15).
-- A dashboard button example and a guide for contributing translations in the README (#17, #18).
+- Danish translation, and a guide for contributing translations in the README (#17).
+- A dashboard button example in the README (#18).
 
 ### Changed
 

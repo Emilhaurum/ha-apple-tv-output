@@ -271,9 +271,10 @@ it does.
 
 ## Translations
 
-The integration is in English. To add a language, copy `custom_components/apple_tv_output/translations/en.json`
+The integration is in English and Danish. To add a language, copy `custom_components/apple_tv_output/translations/en.json`
 to a file named after the language code (`de.json`, `fr.json`, …), translate the text values, and
-open a pull request. Keep the keys and the placeholders in braces, such as `{entity_id}`, unchanged.
+open a pull request. Keep the keys and the placeholders in braces, such as `{entity_id}`, unchanged;
+a test checks that every translation has the same keys and placeholders as the English one.
 
 ## Development
 

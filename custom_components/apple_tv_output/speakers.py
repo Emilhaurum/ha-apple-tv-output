@@ -199,7 +199,7 @@ async def async_resolve(
                 )
             continue
         matches = cache.devices.get(name.casefold(), [])
-        source = "" if speaker.strip() == name else f" (from {speaker.strip()})"
+        source = "" if speaker.strip() == name else f" ({speaker.strip()})"
         if not matches:
             raise error(ServiceValidationError, "speaker_not_found", name=name, source=source, found=cache.names())
         if len(matches) > 1:

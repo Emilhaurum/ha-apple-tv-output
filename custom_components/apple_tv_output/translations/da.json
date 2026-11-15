@@ -1,0 +1,179 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Apple TV Audio Output",
+        "description": "Tilføjer handlinger og entiteter, der sender lyden fra et Apple TV til AirPlay-højttalere. Selve Apple TV'et skal være sat op med Apple TV-integrationen. Vælg bagefter Konfigurer for at vælge de højttalere, et Apple TV altid skal spille på."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Allerede konfigureret. Der kan kun være én konfiguration."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Standardhøjttalere",
+        "description": "Vælg et Apple TV. Lyden sendes til de højttalere, du vælger i næste trin, hver gang det vågner.",
+        "data": {
+          "apple_tv": "Apple TV"
+        }
+      },
+      "speakers": {
+        "title": "Standardhøjttalere",
+        "description": "Vælg højttalerne, eller skriv et AirPlay-navn eller -id. Lad feltet være tomt for at holde op med at sende dette Apple TV's lyd til standardhøjttalere.",
+        "data": {
+          "speakers": "Højttalere"
+        }
+      }
+    },
+    "abort": {
+      "no_apple_tvs": "Der blev ikke fundet noget Apple TV. Sæt først Apple TV'et op med Apple TV-integrationen."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "outputs": {
+        "name": "Lydudgange",
+        "state_attributes": {
+          "outputs": {
+            "name": "Udgange"
+          },
+          "speakers": {
+            "name": "Højttalere"
+          }
+        }
+      }
+    },
+    "select": {
+      "output": {
+        "name": "Lydudgang"
+      }
+    }
+  },
+  "services": {
+    "set_output": {
+      "name": "Vælg lydudgang",
+      "description": "Sender kun Apple TV'ets lyd til disse AirPlay-højttalere. Gør intet, hvis de allerede er de eneste udgange. Kan returnere udgangene før og efter ændringen.",
+      "fields": {
+        "speakers": {
+          "name": "Højttalere",
+          "description": "AirPlay-højttalere: deres AirPlay-navn, en medieafspiller-entitet for højttaleren eller et AirPlay-id."
+        },
+        "force": {
+          "name": "Gennemtving",
+          "description": "Send kommandoen, selv om højttalerne allerede er en udgang."
+        },
+        "retries": {
+          "name": "Nye forsøg",
+          "description": "Hvor mange gange kommandoen sendes igen med et par sekunders mellemrum, hvis en højttaler ikke bliver en udgang. Hjælper lige efter, at Apple TV'et er vågnet."
+        },
+        "fail_if_not_applied": {
+          "name": "Fejl, hvis det ikke lykkes",
+          "description": "Lad handlingen fejle, når en højttaler ikke bliver en udgang, i stedet for kun at skrive en advarsel i loggen."
+        }
+      }
+    },
+    "add_output": {
+      "name": "Tilføj lydudgang",
+      "description": "Føjer AirPlay-højttalere til Apple TV'ets nuværende lydudgange. Gør intet, hvis de allerede er en udgang. Kan returnere udgangene før og efter ændringen.",
+      "fields": {
+        "speakers": {
+          "name": "Højttalere",
+          "description": "AirPlay-højttalere: deres AirPlay-navn, en medieafspiller-entitet for højttaleren eller et AirPlay-id."
+        },
+        "force": {
+          "name": "Gennemtving",
+          "description": "Send kommandoen, selv om højttalerne allerede er en udgang."
+        },
+        "retries": {
+          "name": "Nye forsøg",
+          "description": "Hvor mange gange kommandoen sendes igen med et par sekunders mellemrum, hvis en højttaler ikke bliver en udgang. Hjælper lige efter, at Apple TV'et er vågnet."
+        },
+        "fail_if_not_applied": {
+          "name": "Fejl, hvis det ikke lykkes",
+          "description": "Lad handlingen fejle, når en højttaler ikke bliver en udgang, i stedet for kun at skrive en advarsel i loggen."
+        }
+      }
+    },
+    "remove_output": {
+      "name": "Fjern lydudgang",
+      "description": "Fjerner AirPlay-højttalere fra Apple TV'ets lydudgange. Kan returnere udgangene før og efter ændringen.",
+      "fields": {
+        "speakers": {
+          "name": "Højttalere",
+          "description": "AirPlay-højttalere: deres AirPlay-navn, en medieafspiller-entitet for højttaleren eller et AirPlay-id."
+        }
+      }
+    },
+    "get_outputs": {
+      "name": "Hent lydudgange",
+      "description": "Returnerer Apple TV'ets nuværende lydudgange med lydstyrken for hver, hvor den kendes."
+    },
+    "get_speakers": {
+      "name": "Hent AirPlay-højttalere",
+      "description": "Returnerer de AirPlay-højttalere, der er fundet på netværket, med de navne og id'er, som de andre handlinger accepterer.",
+      "fields": {
+        "rescan": {
+          "name": "Søg igen",
+          "description": "Søg på netværket nu i stedet for at bruge de højttalere, der blev fundet for nylig."
+        }
+      }
+    },
+    "set_volume": {
+      "name": "Indstil højttalerens lydstyrke",
+      "description": "Indstiller lydstyrken for én højttaler, som Apple TV'et spiller på.",
+      "fields": {
+        "speaker": {
+          "name": "Højttaler",
+          "description": "En AirPlay-højttaler: dens AirPlay-navn, en medieafspiller-entitet for den eller dens AirPlay-id."
+        },
+        "volume_level": {
+          "name": "Lydstyrke",
+          "description": "Lydstyrken fra 0 til 1."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "no_apple_tv": {
+      "message": "Handlingen var ikke rettet mod nogen Apple TV-medieafspiller."
+    },
+    "not_apple_tv": {
+      "message": "{entity_id} er ikke en Apple TV-medieafspiller."
+    },
+    "not_connected": {
+      "message": "{entity_id} er ikke forbundet."
+    },
+    "unsupported_version": {
+      "message": "Apple TV-integrationen i Home Assistant {version} fungerer anderledes, end Apple TV Audio Output forventer. Rapportér det venligst som et problem."
+    },
+    "unknown_speaker_entity": {
+      "message": "Ukendt højttalerentitet {entity_id}."
+    },
+    "speaker_not_found": {
+      "message": "Der blev ikke fundet nogen AirPlay-højttaler med navnet \"{name}\"{source}. Fundet: {found}."
+    },
+    "speaker_ambiguous": {
+      "message": "Mere end én AirPlay-højttaler hedder \"{name}\"{source}. Brug AirPlay-id'et for den, du mener: {ids}."
+    },
+    "command_failed": {
+      "message": "Kunne ikke ændre lydudgangen for {entity_id}: {error}"
+    },
+    "not_applied": {
+      "message": "{entity_id} begyndte ikke at spille på {speakers}."
+    },
+    "speaker_not_output": {
+      "message": "{name} er ikke en udgang for {entity_id}."
+    },
+    "volume_not_supported": {
+      "message": "Denne version af Home Assistant kan ikke indstille lydstyrken for en enkelt højttaler. Opdater Home Assistant for at bruge denne handling."
+    }
+  },
+  "issues": {
+    "unsupported_version": {
+      "title": "Apple TV Audio Output virker ikke med denne version af Home Assistant",
+      "description": "Home Assistant {version} har ændret Apple TV-integrationen på en måde, som Apple TV Audio Output ikke forventer, så den kan ikke ændre lydudgangene. Rapportér det venligst på {url}, og se efter en opdatering af Apple TV Audio Output i HACS."
+    }
+  }
+}
