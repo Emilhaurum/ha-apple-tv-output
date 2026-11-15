@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.2]
+
+### Documentation
+
+- Screenshots of the Set audio output action and of the Audio output and Audio outputs entities in
+  the README (#18).
+
 ## [1.2.1]
 
 ### Fixed

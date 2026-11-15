@@ -14,6 +14,8 @@ you, because it has no way to choose the audio output. This integration can send
 speakers every time the Apple TV wakes up, with no automation needed. It also adds actions, a sensor
 and a dropdown for the audio output.
 
+![The Set audio output action in Developer tools, sending an Apple TV's sound to a Sonos speaker](https://raw.githubusercontent.com/Emilhaurum/ha-apple-tv-output/main/docs/set-output-action.png)
+
 ## Requirements
 
 - Home Assistant 2025.1 or newer (tested on 2026.11).
@@ -75,6 +77,8 @@ entities:
 | --- | --- |
 | **Audio outputs** (sensor) | The names of the outputs the Apple TV plays to. Its attributes list each output's name, AirPlay id and volume. Use it on a dashboard or as an automation trigger. |
 | **Audio output** (select) | A dropdown of the speakers found on the network. Choosing one sends the sound to that speaker only. When the Apple TV plays to several speakers, nothing is selected. |
+
+<img src="https://raw.githubusercontent.com/Emilhaurum/ha-apple-tv-output/main/docs/audio-output-entities.png" width="414" alt="The Audio output dropdown and the Audio outputs sensor on an Apple TV's device page">
 
 The entities update within a few seconds of a change, including changes made on the Apple TV itself.
 They are unavailable while Home Assistant is not connected to the Apple TV. A new Apple TV gets its
