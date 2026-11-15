@@ -14,6 +14,17 @@ set_output:
       default: false
       selector:
         boolean:
+    retries:
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 5
+          mode: box
+    fail_if_not_applied:
+      default: false
+      selector:
+        boolean:
 add_output:
   target:
     entity:
@@ -27,6 +38,17 @@ add_output:
         text:
           multiple: true
     force:
+      default: false
+      selector:
+        boolean:
+    retries:
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 5
+          mode: box
+    fail_if_not_applied:
       default: false
       selector:
         boolean:
@@ -47,3 +69,28 @@ get_outputs:
     entity:
       integration: apple_tv
       domain: media_player
+get_speakers:
+  fields:
+    rescan:
+      default: false
+      selector:
+        boolean:
+set_volume:
+  target:
+    entity:
+      integration: apple_tv
+      domain: media_player
+  fields:
+    speaker:
+      required: true
+      example: "Living Room"
+      selector:
+        text:
+    volume_level:
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 1
+          step: 0.01
+          mode: slider
