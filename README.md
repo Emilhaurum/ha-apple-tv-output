@@ -110,7 +110,7 @@ are skipped. An entity picked by name must be a connected Apple TV.
 | `apple_tv_output.set_output` | Sends the sound to the given speakers only. |
 | `apple_tv_output.add_output` | Adds the given speakers to the current outputs. |
 | `apple_tv_output.remove_output` | Removes the given speakers from the outputs. |
-| `apple_tv_output.get_outputs` | Returns the current outputs, with the volume of each, as response data. |
+| `apple_tv_output.get_outputs` | Returns the current outputs, with the volume of each where known, as response data. |
 | `apple_tv_output.get_speakers` | Returns the AirPlay speakers found on the network. Set `rescan: true` to scan again now. |
 | `apple_tv_output.set_volume` | Sets the volume (0 to 1) of one `speaker` the Apple TV plays to. Needs Home Assistant 2026.2 or newer. |
 
@@ -222,6 +222,9 @@ media_player.apple_tv:
       identifier: 34:7E:5C:D6:4E:1E
       volume_level: 0.35
 ```
+
+The Apple TV reports a speaker's volume only after it has changed, so `volume_level` is missing until
+then. A muted speaker also shows no volume, because 0 cannot be told apart from "not reported yet".
 
 ## Troubleshooting
 

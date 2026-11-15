@@ -13,7 +13,7 @@ import pytest
 from custom_components.apple_tv_output.const import DOMAIN, ISSUE_UNSUPPORTED_VERSION
 from custom_components.apple_tv_output.speakers import async_start_background_scans
 
-from .conftest import ATV_ENTITY, FakeSpeaker, Network
+from .conftest import ATV_ENTITY, HAS_VOLUME, FakeSpeaker, Network
 
 LIVING = FakeSpeaker("Living Room", "34:7E:5C:D6:4E:1E")
 KITCHEN = FakeSpeaker("Kitchen", "48:A6:B8:00:00:01")
@@ -184,3 +184,15 @@ async def test_set_volume_speaker_entity_with_wrong_address(hass: HomeAssistant,
     atv.audio.set_current(("Kitchen", KITCHEN.airplay_id))
     await call(hass, "set_volume", speaker="media_player.kitchen", volume_level=0.5)
     assert atv.audio.volumes == [(50.0, KITCHEN.airplay_id)]
+
+
+@pytest.mark.skipif(not HAS_VOLUME, reason="older pyatv has no volume per output")
+async def test_get_outputs_volume(hass: HomeAssistant, atv: Any) -> None:
+    """A reported volume is shown; 0, which also means "not reported yet", is left out."""
+    atv.audio.set_current(("Living Room", LIVING.airplay_id), ("Kitchen", KITCHEN.airplay_id))
+    atv.audio.output_devices[0].volume = 35.0
+    result = await call(hass, "get_outputs", response=True)
+    assert result[ATV_ENTITY]["outputs"] == [
+        {"name": "Living Room", "identifier": LIVING.airplay_id, "volume_level": 0.35},
+        {"name": "Kitchen", "identifier": KITCHEN.airplay_id},
+    ]
