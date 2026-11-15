@@ -91,7 +91,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
         apple_tvs = targets(hass, call)
         (speaker,) = await async_resolve(hass, [call.data[ATTR_SPEAKER]])
         for tv in apple_tvs:
-            await async_set_volume(tv, speaker, call.data[ATTR_VOLUME_LEVEL])
+            await async_set_volume(hass, tv, speaker, call.data[ATTR_VOLUME_LEVEL])
 
     for service in (SERVICE_SET_OUTPUT, SERVICE_ADD_OUTPUT):
         hass.services.async_register(

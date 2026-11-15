@@ -162,3 +162,25 @@ async def test_repairs_issue(hass: HomeAssistant, atv: Any, entity_component: di
     entity_component.clear()
     await call(hass, "get_outputs", response=True)
     assert issues.async_get_issue(DOMAIN, ISSUE_UNSUPPORTED_VERSION) is None
+
+
+async def test_speaker_entity_known_name_skips_wrong_address(hass: HomeAssistant, atv: Any, network: Network) -> None:
+    """The scan knows the entity's name and its address is not an AirPlay id: no wrong command is sent."""
+    await hass.services.async_call(DOMAIN, "get_speakers", {}, blocking=True, return_response=True)
+    add_speaker_entity(hass, "media_player.kitchen", "Kitchen", "AA:AA:AA:AA:AA:AA")
+    await call(hass, "set_output", speakers=["media_player.kitchen"])
+    assert atv.audio.calls == [("set", (KITCHEN.airplay_id,))]
+
+
+async def test_remove_speaker_entity_with_wrong_address(hass: HomeAssistant, atv: Any) -> None:
+    add_speaker_entity(hass, "media_player.kitchen", "Kitchen", "AA:AA:AA:AA:AA:AA")
+    atv.audio.set_current(("Kitchen", KITCHEN.airplay_id))
+    await call(hass, "remove_output", speakers=["media_player.kitchen"])
+    assert atv.audio.calls == [("remove", (KITCHEN.airplay_id,))]
+
+
+async def test_set_volume_speaker_entity_with_wrong_address(hass: HomeAssistant, atv: Any) -> None:
+    add_speaker_entity(hass, "media_player.kitchen", "Kitchen", "AA:AA:AA:AA:AA:AA")
+    atv.audio.set_current(("Kitchen", KITCHEN.airplay_id))
+    await call(hass, "set_volume", speaker="media_player.kitchen", volume_level=0.5)
+    assert atv.audio.volumes == [(50.0, KITCHEN.airplay_id)]

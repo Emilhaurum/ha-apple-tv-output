@@ -115,10 +115,80 @@ async def test_default_speakers_on_wake(hass: HomeAssistant, atv: Any, setup_int
     assert [d.name for d in atv.audio.output_devices] == ["Living Room"]
 
 
-async def test_default_speakers_when_already_awake(hass: HomeAssistant, atv: Any, setup_integration: Any) -> None:
+async def test_default_speakers_not_applied_when_already_awake(
+    hass: HomeAssistant, atv: Any, setup_integration: Any
+) -> None:
+    """Home Assistant starts while the Apple TV is on: the user may have picked the speaker by hand."""
     hass.states.async_set(ATV_ENTITY, "playing")
     await setup_integration({CONF_DEFAULT_SPEAKERS: {atv_registry_id(hass): ["Kitchen"]}})
+    assert atv.audio.calls == []
+
+
+async def test_default_speakers_after_unknown_state(hass: HomeAssistant, atv: Any, setup_integration: Any) -> None:
+    """Unknown (starting up) to idle is not a wake-up; off to idle afterwards is."""
+    await setup_integration({CONF_DEFAULT_SPEAKERS: {atv_registry_id(hass): ["Kitchen"]}})
+    hass.states.async_set(ATV_ENTITY, "idle")
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert atv.audio.calls == []
+    hass.states.async_set(ATV_ENTITY, "off")
+    hass.states.async_set(ATV_ENTITY, "idle")
+    await hass.async_block_till_done(wait_background_tasks=True)
     assert atv.audio.calls == [("set", (KITCHEN.airplay_id,))]
+
+
+async def test_default_speakers_not_applied_after_connection_gap(
+    hass: HomeAssistant, atv: Any, setup_integration: Any
+) -> None:
+    """Playing, unavailable for a moment, playing again: not a wake-up."""
+    hass.states.async_set(ATV_ENTITY, "playing")
+    await setup_integration({CONF_DEFAULT_SPEAKERS: {atv_registry_id(hass): ["Kitchen"]}})
+    for state in ("unavailable", "playing"):
+        hass.states.async_set(ATV_ENTITY, state)
+        await hass.async_block_till_done(wait_background_tasks=True)
+    assert atv.audio.calls == []
+
+
+async def test_default_speakers_not_applied_on_reload(hass: HomeAssistant, atv: Any, setup_integration: Any) -> None:
+    hass.states.async_set(ATV_ENTITY, "off")
+    entry = await setup_integration({CONF_DEFAULT_SPEAKERS: {atv_registry_id(hass): ["Kitchen"]}})
+    hass.states.async_set(ATV_ENTITY, "idle")
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert len(atv.audio.calls) == 1
+    # The user picks another speaker by hand; reloading must not switch back.
+    atv.audio.set_current(("Living Room", LIVING.airplay_id))
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert len(atv.audio.calls) == 1
+
+
+async def test_changed_default_speakers_applied_at_once(hass: HomeAssistant, atv: Any, setup_integration: Any) -> None:
+    hass.states.async_set(ATV_ENTITY, "playing")
+    entry = await setup_integration()
+    hass.config_entries.async_update_entry(entry, options={CONF_DEFAULT_SPEAKERS: {atv_registry_id(hass): ["Kitchen"]}})
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert atv.audio.calls == [("set", (KITCHEN.airplay_id,))]
+
+
+async def test_default_speakers_stop_on_lasting_error(
+    hass: HomeAssistant, atv: Any, setup_integration: Any, caplog: pytest.LogCaptureFixture
+) -> None:
+    """An error that waiting cannot fix is not retried for the whole connection wait."""
+    hass.states.async_set(ATV_ENTITY, "off")
+    await setup_integration({CONF_DEFAULT_SPEAKERS: {atv_registry_id(hass): ["Garage"]}})
+    hass.states.async_set(ATV_ENTITY, "idle")
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert caplog.text.count("Could not send media_player.living_room_tv to its default speakers") == 1
+    assert atv.audio.calls == []
+
+
+async def test_renamed_apple_tv(hass: HomeAssistant, atv: Any, setup_integration: Any) -> None:
+    """The entities follow an Apple TV whose entity id is changed."""
+    await setup_integration()
+    er.async_get(hass).async_update_entity(ATV_ENTITY, new_entity_id="media_player.lounge_tv")
+    await hass.async_block_till_done(wait_background_tasks=True)
+    atv.audio.set_current(("Kitchen", KITCHEN.airplay_id))
+    await poll(hass)
+    assert hass.states.get(SENSOR).state == "Kitchen"
 
 
 async def test_default_speakers_wait_for_connection(hass: HomeAssistant, atv: Any, setup_integration: Any) -> None:
@@ -202,12 +272,60 @@ async def test_unload(hass: HomeAssistant, atv: Any, setup_integration: Any) -> 
 
 
 async def test_diagnostics(hass: HomeAssistant, atv: Any, setup_integration: Any) -> None:
-    entry = await setup_integration({CONF_DEFAULT_SPEAKERS: {atv_registry_id(hass): ["Kitchen"]}})
+    entry = await setup_integration({CONF_DEFAULT_SPEAKERS: {atv_registry_id(hass): ["Kitchen", LIVING.airplay_id]}})
     atv.audio.set_current(("Living Room", LIVING.airplay_id))
     await poll(hass)
     data = await async_get_config_entry_diagnostics(hass, entry)
-    assert data["default_speakers"] == {ATV_ENTITY: ["Kitchen"]}
+    assert data["default_speakers"] == {ATV_ENTITY: ["Kitchen", "**REDACTED**"]}
     assert data["apple_tvs"][0]["connected"] is True
     assert data["apple_tvs"][0]["outputs"][0] == {"name": "Living Room", "identifier": "**REDACTED**", **VOLUME}
     assert {"name": "Kitchen", "identifier": "**REDACTED**"} in data["speakers_found"]
     assert data["versions"]["integration"] == "1.2.0"
+
+
+async def test_default_speakers_no_wait_on_unsupported_version(
+    hass: HomeAssistant, atv: Any, setup_integration: Any
+) -> None:
+    """Only a missing connection is waited for; changed internals are not."""
+    hass.states.async_set(ATV_ENTITY, "off")
+    await setup_integration({CONF_DEFAULT_SPEAKERS: {atv_registry_id(hass): ["Kitchen"]}})
+    hass.config_entries.async_entries("apple_tv")[0].runtime_data = SimpleNamespace(connection=atv)
+    attempts = 0
+    real_get_apple_tv = defaults.get_apple_tv
+
+    def get_apple_tv(*args: Any, **kwargs: Any) -> Any:
+        nonlocal attempts
+        attempts += 1
+        return real_get_apple_tv(*args, **kwargs)
+
+    with patch.object(defaults, "get_apple_tv", get_apple_tv):
+        hass.states.async_set(ATV_ENTITY, "idle")
+        await hass.async_block_till_done(wait_background_tasks=True)
+    assert attempts == 1
+
+
+async def test_homepod_does_not_reload(hass: HomeAssistant, atv: Any, network: Network, setup_integration: Any) -> None:
+    entry = await setup_integration()
+    with patch.object(hass.config_entries, "async_schedule_reload") as reload:
+        add_apple_tv(
+            hass,
+            network,
+            "homepod",
+            "HomePod",
+            "88888888-2222-3333-4444-555555555555",
+            "AA:BB:CC:00:00:02",
+            model="HomePod mini",
+        )
+        await hass.async_block_till_done()
+    reload.assert_not_called()
+    assert entry.state is ConfigEntryState.LOADED
+
+
+async def test_reload_does_not_scan_again(
+    hass: HomeAssistant, atv: Any, network: Network, setup_integration: Any
+) -> None:
+    entry = await setup_integration()
+    assert network.scans == 1
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert network.scans == 1

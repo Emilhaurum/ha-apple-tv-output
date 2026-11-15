@@ -81,6 +81,8 @@ async def async_change(
 ) -> list[Speaker]:
     """Change the outputs of one Apple TV; return the speakers, which a rescan may have updated."""
     audio = tv.atv.audio
+    if mode is Mode.REMOVE:
+        speakers = await _by_name_if_absent(hass, tv, speakers)
     now = current(tv.atv)
     present = [next((now[k] for k in s.device.keys if k in now), None) for s in speakers]
 
@@ -141,11 +143,24 @@ async def async_change(
     return speakers
 
 
-async def async_set_volume(tv: AppleTV, speaker: Speaker, level: float) -> None:
+async def _by_name_if_absent(hass: HomeAssistant, tv: AppleTV, speakers: list[Speaker]) -> list[Speaker]:
+    """Look up by name the entities whose unconfirmed network address is not among the outputs."""
+    now = current(tv.atv)
+    if not any(s.by_address and not s.device.keys & now.keys() for s in speakers):
+        return speakers
+    try:
+        return await async_resolve(hass, [s.requested for s in speakers], by_address=False)
+    except HomeAssistantError as err:
+        _LOGGER.debug("Looking the speakers up by name did not help: %s", err)
+        return speakers
+
+
+async def async_set_volume(hass: HomeAssistant, tv: AppleTV, speaker: Speaker, level: float) -> None:
     """Set the volume (0-1) of one output speaker."""
     set_volume = tv.atv.audio.set_volume
     if "output_device" not in inspect.signature(set_volume).parameters:
         raise error(HomeAssistantError, "volume_not_supported")
+    (speaker,) = await _by_name_if_absent(hass, tv, [speaker])
     device = next((d for d in tv.atv.audio.output_devices if key(d.identifier or "") in speaker.device.keys), None)
     if device is None:
         raise error(ServiceValidationError, "speaker_not_output", entity_id=tv.entity_id, name=speaker.device.name)

@@ -56,11 +56,15 @@ To always play an Apple TV through the same speakers, open **Apple TV Audio Outp
 **Settings → Devices & services** and select **Configure**. Choose the Apple TV, then the speakers.
 You can pick speakers found on the network or type an AirPlay name or id.
 
-Whenever that Apple TV wakes up, its sound goes to those speakers. The integration waits up to
-30 seconds for Home Assistant's connection to the Apple TV, and tries again a few times if a speaker
-does not start playing at once. If you pick another speaker by hand while the Apple TV is on, it is
-left alone until the Apple TV next wakes up. To stop, configure the Apple TV again and leave the
-speakers empty.
+Whenever that Apple TV wakes up (its media player goes from off to on), its sound goes to those
+speakers. The integration waits up to 30 seconds for Home Assistant's connection to the Apple TV, and
+tries again a few times if a speaker does not start playing at once. When you set or change the
+speakers of an Apple TV that is on, they are applied at once.
+
+If you pick another speaker by hand while the Apple TV is on, it is left alone until the Apple TV
+next wakes up. Restarting Home Assistant, reloading the integration, or a short loss of the
+connection to the Apple TV does not count as waking up. To stop, configure the Apple TV again and
+leave the speakers empty.
 
 ## Entities
 
@@ -117,8 +121,10 @@ are skipped. An entity picked by name must be a connected Apple TV.
 - the speaker's AirPlay name, as shown in the Apple TV's audio menu (`Living Room`). Upper and
   lower case do not matter. `get_speakers` lists the names that work;
 - a media player entity of the speaker (`media_player.living_room`). When its integration has
-  registered the speaker's network address, as Sonos does, that address is used, so the entity's
-  name does not matter. Otherwise its name must be the same as the AirPlay name;
+  registered the speaker's network address, as Sonos does, and a scan found a speaker with that
+  address, that speaker is used, so the entity's name does not matter. Otherwise the entity's name
+  is used, and must be the same as the AirPlay name. If neither is known yet, the address is tried
+  first and the name after it;
 - the speaker's AirPlay id (`34:7E:5C:D6:4E:1E`). It can also be written in lower case, with dashes
   or with nothing between the pairs of digits.
 

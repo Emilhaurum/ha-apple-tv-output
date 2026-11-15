@@ -5,11 +5,12 @@ from __future__ import annotations
 from importlib.metadata import PackageNotFoundError, version
 from typing import TYPE_CHECKING, Any
 
-from homeassistant.components.diagnostics import async_redact_data
+from homeassistant.components.diagnostics import REDACTED, async_redact_data
 from homeassistant.const import __version__ as HA_VERSION
 from homeassistant.core import HomeAssistant
 from homeassistant.loader import async_get_integration
 
+from .common import is_id
 from .const import DOMAIN
 from .defaults import default_speakers
 from .speakers import get_cache
@@ -30,7 +31,11 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: AppleTV
     cache = get_cache(hass)
     data = {
         "versions": {"integration": str(integration.version), "home_assistant": HA_VERSION, "pyatv": pyatv_version},
-        "default_speakers": default_speakers(hass, entry),
+        # Speakers can be typed in as AirPlay ids; redact those, keep names.
+        "default_speakers": {
+            entity_id: [REDACTED if is_id(s.strip()) else s for s in speakers]
+            for entity_id, speakers in default_speakers(hass, entry).items()
+        },
         "speakers_found": [{"name": d.name, "identifier": d.identifier} for d in cache.all()],
         "apple_tvs": [
             {

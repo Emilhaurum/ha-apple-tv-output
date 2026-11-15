@@ -6,7 +6,9 @@ actions and entities for it, reusing the connection the Apple TV integration alr
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
@@ -14,8 +16,8 @@ from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.typing import ConfigType
 
-from .apple_tv import apple_tv_players
-from .const import APPLE_TV_DOMAIN, DOMAIN
+from .apple_tv import apple_tv_players, is_apple_tv_player
+from .const import DOMAIN
 from .defaults import async_setup_defaults
 from .services import async_setup_services
 from .speakers import async_start_background_scans
@@ -47,28 +49,34 @@ async def async_setup_entry(hass: HomeAssistant, entry: AppleTVOutputConfigEntry
     entry.runtime_data = RuntimeData(trackers)
     for tracker in trackers:
         entry.async_on_unload(tracker.async_start())
-    entry.async_on_unload(async_start_background_scans(hass))
+    entry.async_on_unload(async_start_background_scans(hass, entry))
     entry.async_on_unload(async_setup_defaults(hass, entry))
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
 
-    @callback
-    def registry_updated(event: Event[er.EventEntityRegistryUpdatedData]) -> None:
-        # An Apple TV was added or removed: set up again, so its entities follow.
-        if event.data["action"] in ("create", "remove"):
-            hass.config_entries.async_schedule_reload(entry.entry_id)
+    tracked = {t.entity_id for t in trackers}
 
     @callback
-    def is_apple_tv_player(event_data: er.EventEntityRegistryUpdatedData) -> bool:
-        entity_id = event_data["entity_id"]
-        if not entity_id.startswith("media_player."):
+    def affects_apple_tvs(event_data: er.EventEntityRegistryUpdatedData) -> bool:
+        """Return whether an Apple TV was added, removed, renamed, enabled or disabled."""
+        action = event_data["action"]
+        if action == "update":
+            changes: Mapping[str, Any] = event_data.get("changes") or {}  # type: ignore[assignment]
+            if "entity_id" not in changes and "disabled_by" not in changes:
+                return False
+        if event_data["entity_id"] in tracked:
+            return True
+        if action == "remove":
             return False
-        if event_data["action"] == "remove":
-            return any(t.entity_id == entity_id for t in trackers)
-        registry_entry = er.async_get(hass).async_get(entity_id)
-        return registry_entry is not None and registry_entry.platform == APPLE_TV_DOMAIN
+        registry_entry = er.async_get(hass).async_get(event_data["entity_id"])
+        return is_apple_tv_player(hass, registry_entry) and not registry_entry.disabled  # type: ignore[union-attr]
+
+    @callback
+    def registry_updated(_event: Event[er.EventEntityRegistryUpdatedData]) -> None:
+        # Set up again, so the entities and the default speakers follow.
+        hass.config_entries.async_schedule_reload(entry.entry_id)
 
     entry.async_on_unload(
-        hass.bus.async_listen(er.EVENT_ENTITY_REGISTRY_UPDATED, registry_updated, event_filter=is_apple_tv_player)
+        hass.bus.async_listen(er.EVENT_ENTITY_REGISTRY_UPDATED, registry_updated, event_filter=affects_apple_tvs)
     )
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True

@@ -11,6 +11,7 @@ import time
 
 from homeassistant.components import zeroconf
 from homeassistant.components.media_player import DOMAIN as MEDIA_PLAYER_DOMAIN
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import device_registry as dr, entity_registry as er
@@ -137,16 +138,20 @@ async def async_scan(hass: HomeAssistant, *, force: bool = True) -> Cache:
 
 
 @callback
-def async_start_background_scans(hass: HomeAssistant) -> Callable[[], None]:
-    """Scan now and then shortly before the speakers found expire, so calls by name need not wait."""
+def async_start_background_scans(hass: HomeAssistant, entry: ConfigEntry | None = None) -> Callable[[], None]:
+    """Scan now (unless a recent scan is fresh) and shortly before the speakers found expire."""
 
-    async def refresh(_now: object = None) -> None:
+    async def refresh(_now: object = None, *, force: bool = True) -> None:
         try:
-            await async_scan(hass)
+            await async_scan(hass, force=force)
         except Exception as err:
             _LOGGER.debug("Background scan for AirPlay speakers failed: %s", err)
 
-    hass.async_create_background_task(refresh(), f"{DOMAIN} first scan")
+    first = refresh(force=False)
+    if entry is not None:
+        entry.async_create_background_task(hass, first, f"{DOMAIN} first scan")
+    else:
+        hass.async_create_background_task(first, f"{DOMAIN} first scan")
     return async_track_time_interval(hass, refresh, timedelta(seconds=CACHE_TTL * 0.9), name=f"{DOMAIN} scan")
 
 
@@ -166,7 +171,8 @@ async def async_resolve(
 ) -> list[Speaker]:
     """Turn AirPlay ids, speaker names and media player entities into speakers."""
     cache = get_cache(hass)
-    # (as given, the name or id to look up, whether it is an entity's network address)
+    known = cache.by_key()
+    # (as given, the name or id to look up, whether it is an unconfirmed network address of an entity)
     wanted: list[tuple[str, str, bool]] = []
     for speaker in speakers:
         text = speaker.strip()
@@ -175,7 +181,14 @@ async def async_resolve(
             if (state := hass.states.get(text)) is None:
                 raise error(ServiceValidationError, "unknown_speaker_entity", entity_id=text)
             mac = _entity_address(hass, text) if by_address else None
-            text, address = (mac, True) if mac else (state.name, False)
+            if mac and key(mac) in known:
+                # The address is the id of a speaker the scan found: no doubt about it.
+                text = mac
+            elif mac and state.name.casefold() not in cache.devices:
+                # Neither the address nor the name is known: try the address, falling back to the name.
+                text, address = mac, True
+            else:
+                text = state.name
         wanted.append((speaker, text, address))
 
     scanned = False
@@ -184,8 +197,8 @@ async def async_resolve(
     ):
         await async_scan(hass)
         scanned = True
+        known = cache.by_key()
 
-    known = cache.by_key()
     result = []
     for speaker, name, address in wanted:
         if is_id(name):
