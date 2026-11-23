@@ -73,7 +73,8 @@ def async_setup_defaults(hass: HomeAssistant, connection: AppleTVConnection) -> 
             @callback
             def first_connect() -> None:
                 nonlocal waiting
-                if waiting and connection.atv is not None:
+                # Wait until connected and the power state is known.
+                if waiting and connection.atv is not None and connection.power_on is not None:
                     waiting = False
                     if connection.power_on:
                         start()

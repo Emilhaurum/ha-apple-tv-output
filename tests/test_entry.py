@@ -13,6 +13,7 @@ from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import device_registry as dr, issue_registry as ir
+from pyatv.const import PowerState
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -148,7 +149,7 @@ async def test_default_speakers_after_sleep_dropped_connection(hass: HomeAssista
     atv, _ = await setup_integration(DEFAULTS)
     atv.set_power(False)
     atv.lose_connection()
-    atv.power = atv.power.__class__.On
+    atv.power = PowerState.On
     await reconnected(hass)
     await hass.async_block_till_done(wait_background_tasks=True)
     assert atv.audio.calls == [("set", (KITCHEN.airplay_id,))]
@@ -283,3 +284,36 @@ async def test_diagnostics(hass: HomeAssistant, setup_integration: Any) -> None:
         (Path(__file__).parent.parent / "custom_components/apple_tv_output/manifest.json").read_text()
     )
     assert data["versions"]["integration"] == manifest["version"]
+
+
+async def test_waits_for_paired_service(hass: HomeAssistant, setup_integration: Any) -> None:
+    """Found without its AirPlay service yet: no attempt without credentials, no request to pair again."""
+    atv, _ = await setup_integration()
+    atv.announces_airplay = False
+    atv.lose_connection()
+    await reconnected(hass)
+    assert atv.connection is None
+    assert hass.config_entries.flow.async_progress_by_handler(DOMAIN) == []
+    atv.announces_airplay = True
+    await reconnected(hass)
+    assert atv.connection is not None
+
+
+async def test_changed_defaults_wait_for_power_state(hass: HomeAssistant, setup_integration: Any) -> None:
+    """After the reload for new default speakers, the power state is reported only after connecting."""
+    atv, entry = await setup_integration()
+    atv.power = PowerState.Unknown
+    hass.config_entries.async_update_entry(entry, options=DEFAULTS)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert atv.audio.calls == []
+    atv.set_power(True)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert atv.audio.calls == [("set", (KITCHEN.airplay_id,))]
+
+
+async def test_select_apple_tv_itself(hass: HomeAssistant, setup_integration: Any) -> None:
+    """Playing only through the Apple TV itself shows it as the chosen option."""
+    atv, _ = await setup_integration()
+    atv.audio.set_current((ATV_NAME, "AA:BB:CC:DD:EE:FF"))
+    await hass.async_block_till_done()
+    assert hass.states.get(SELECT).state == ATV_NAME

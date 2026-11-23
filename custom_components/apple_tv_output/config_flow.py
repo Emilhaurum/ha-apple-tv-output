@@ -55,22 +55,35 @@ PAIRING_NAME = "Home Assistant (Apple TV Audio Output)"
 # Pairing these gives the control channel that changes the outputs: AirPlay (which carries it on
 # tvOS 15 and newer) and, on older tvOS, the separate remote control (MRP) service.
 PAIR_PROTOCOLS = (Protocol.AirPlay, Protocol.MRP)
-HOMEPODS = {DeviceModel.HomePod, DeviceModel.HomePodMini}
+NOT_APPLE_TVS = {
+    DeviceModel.HomePod,
+    DeviceModel.HomePodMini,
+    DeviceModel.AirPortExpress,
+    DeviceModel.AirPortExpressGen2,
+}
+# Protocols whose pairing can be done; NotNeeded, Disabled and Unsupported are skipped.
+PAIRABLE = {PairingRequirement.Mandatory, PairingRequirement.Optional}
 
 
 def _is_apple_tv(conf: Any) -> bool:
+    """Return whether a device found by the scan is an Apple TV (not a HomePod or another speaker)."""
     info = conf.device_info
-    if info.operating_system is not OperatingSystem.TvOS or info.model in HOMEPODS:
+    if info.model in NOT_APPLE_TVS or not any(conf.get_service(p) is not None for p in PAIR_PROTOCOLS):
         return False
-    return any(conf.get_service(p) is not None for p in PAIR_PROTOCOLS)
+    # The operating system comes from what the device announces and can be unknown; a remote control
+    # (MRP) service also marks an Apple TV.
+    return info.operating_system is OperatingSystem.TvOS or conf.get_service(Protocol.MRP) is not None
 
 
 def _needs_pairing(conf: Any) -> list[Protocol]:
-    """Return the protocols that must be paired, in order."""
+    """Return the protocols to pair, in order.
+
+    Optional pairing is done too: the control channel over AirPlay needs AirPlay credentials.
+    """
     return [
         protocol
         for protocol in PAIR_PROTOCOLS
-        if (service := conf.get_service(protocol)) is not None and service.pairing is PairingRequirement.Mandatory
+        if (service := conf.get_service(protocol)) is not None and service.pairing in PAIRABLE
     ]
 
 

@@ -193,6 +193,10 @@ class FakeAppleTVDevice:
     model: DeviceModel = DeviceModel.AppleTV4KGen3
     power: PowerState = PowerState.On
     online: bool = True
+    airplay_pairing: PairingRequirement = PairingRequirement.Mandatory
+    # Whether the AirPlay service is announced (on the network, it can show up after the others).
+    announces_airplay: bool = True
+    operating_system: OperatingSystem = OperatingSystem.TvOS
     # The credentials it accepts for each protocol (set by pairing).
     accepted: dict[Protocol, str] = field(default_factory=dict)
     connection: FakeAppleTV | None = None
@@ -201,11 +205,10 @@ class FakeAppleTVDevice:
         self.audio = FakeAudio(self.network)
 
     def conf(self) -> FakeConf:
-        services = {
-            Protocol.MRP: FakeService(self.mrp_id),
-            Protocol.AirPlay: FakeService(self.airplay_id, PairingRequirement.Mandatory),
-        }
-        info = SimpleNamespace(operating_system=OperatingSystem.TvOS, model=self.model)
+        services = {Protocol.MRP: FakeService(self.mrp_id)}
+        if self.announces_airplay:
+            services[Protocol.AirPlay] = FakeService(self.airplay_id, self.airplay_pairing)
+        info = SimpleNamespace(operating_system=self.operating_system, model=self.model)
         return FakeConf(self.name, self.address, services, info)
 
     def connect(self, conf: FakeConf) -> FakeAppleTV:

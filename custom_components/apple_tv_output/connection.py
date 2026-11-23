@@ -137,9 +137,17 @@ class AppleTVConnection(DeviceListener, PowerListener, AudioListener):
         if conf is None:
             _LOGGER.debug("%s was not found on the network", self.name)
             return
+        missing = []
         for protocol, credentials in self.entry.data.get(const.CONF_CREDENTIALS, {}).items():
             if conf.get_service(Protocol(int(protocol))) is not None:
                 conf.set_credentials(Protocol(int(protocol)), credentials)
+            else:
+                missing.append(Protocol(int(protocol)).name)
+        if missing:
+            # Connecting without the paired protocol's credentials would fail as if the pairing were
+            # rejected; the service is usually just not announced yet, so try again later.
+            _LOGGER.debug("%s was found without %s yet", self.name, ", ".join(missing))
+            return
         atv = await pyatv.connect(conf, self.hass.loop, session=async_get_clientsession(self.hass))
         if self._stopped:
             atv.close()

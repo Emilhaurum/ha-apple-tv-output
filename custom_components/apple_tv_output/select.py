@@ -38,6 +38,10 @@ class OutputSelect(AppleTVOutputEntity, SelectEntity):
     def _update_from_connection(self) -> None:
         current = self.speaker_names
         names = {d.name for d in get_cache(self.connection.hass).all()} | set(current)
+        if not current and self.outputs:
+            # Playing only through the Apple TV itself, which can be chosen too.
+            current = [self.connection.name]
+            names.add(self.connection.name)
         self._attr_options = sorted(names, key=str.casefold)
         self._attr_current_option = current[0] if len(current) == 1 else None
 

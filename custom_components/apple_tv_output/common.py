@@ -8,8 +8,6 @@ from homeassistant.exceptions import HomeAssistantError
 
 from .const import DOMAIN
 
-ISSUE_URL = "https://github.com/Emilhaurum/ha-apple-tv-output/issues"
-
 # AirPlay ids: a MAC address (with colons, dashes or nothing between the bytes) or a UUID.
 _MAC = re.compile(r"^[0-9A-F]{2}(?:([:-]?)[0-9A-F]{2})(?:\1[0-9A-F]{2}){4}$", re.I)
 _UUID = re.compile(r"^[0-9A-F]{8}(?:-[0-9A-F]{4}){3}-[0-9A-F]{12}$", re.I)

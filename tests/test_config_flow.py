@@ -11,7 +11,7 @@ from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.setup import async_setup_component
-from pyatv.const import DeviceModel, Protocol
+from pyatv.const import DeviceModel, OperatingSystem, PairingRequirement, Protocol
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -157,3 +157,21 @@ async def test_errors_are_translated(hass: HomeAssistant) -> None:
         await hass.services.async_call(
             DOMAIN, "set_output", {"entity_id": "media_player.other", "speakers": ["Kitchen"]}, blocking=True
         )
+
+
+async def test_optional_pairing_is_done(hass: HomeAssistant, network: Network) -> None:
+    """AirPlay pairing reported as optional is still done: the control channel needs its credentials."""
+    network.apple_tvs[0].airplay_pairing = PairingRequirement.Optional
+    result = await start(hass)
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"device": ATV_MRP_ID})
+    assert result["step_id"] == "pin"
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"pin": str(PIN)})
+    assert list(result["data"][CONF_CREDENTIALS]) == [str(Protocol.AirPlay.value)]
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+
+async def test_apple_tv_with_unknown_os_is_offered(hass: HomeAssistant, network: Network) -> None:
+    network.apple_tvs[0].operating_system = OperatingSystem.Unknown
+    result = await start(hass)
+    options = result["data_schema"].schema["device"].config["options"]
+    assert [o["value"] for o in options] == [ATV_MRP_ID]
