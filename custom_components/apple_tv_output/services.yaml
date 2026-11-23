@@ -1,8 +1,11 @@
 set_output:
   target:
     entity:
-      integration: apple_tv
-      domain: media_player
+      - integration: apple_tv_output
+      - integration: apple_tv
+        domain: media_player
+    device:
+      - integration: apple_tv_output
   fields:
     speakers:
       required: true
@@ -28,8 +31,11 @@ set_output:
 add_output:
   target:
     entity:
-      integration: apple_tv
-      domain: media_player
+      - integration: apple_tv_output
+      - integration: apple_tv
+        domain: media_player
+    device:
+      - integration: apple_tv_output
   fields:
     speakers:
       required: true
@@ -55,8 +61,11 @@ add_output:
 remove_output:
   target:
     entity:
-      integration: apple_tv
-      domain: media_player
+      - integration: apple_tv_output
+      - integration: apple_tv
+        domain: media_player
+    device:
+      - integration: apple_tv_output
   fields:
     speakers:
       required: true
@@ -67,8 +76,11 @@ remove_output:
 get_outputs:
   target:
     entity:
-      integration: apple_tv
-      domain: media_player
+      - integration: apple_tv_output
+      - integration: apple_tv
+        domain: media_player
+    device:
+      - integration: apple_tv_output
 get_speakers:
   fields:
     rescan:
@@ -78,8 +90,11 @@ get_speakers:
 set_volume:
   target:
     entity:
-      integration: apple_tv
-      domain: media_player
+      - integration: apple_tv_output
+      - integration: apple_tv
+        domain: media_player
+    device:
+      - integration: apple_tv_output
   fields:
     speaker:
       required: true

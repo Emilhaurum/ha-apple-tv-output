@@ -1,19 +1,23 @@
-"""Finding Apple TVs and the pyatv connections the Apple TV integration holds for them."""
+"""Finding the paired Apple TVs, and the ones an action call targets."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from homeassistant.components.media_player import DATA_COMPONENT, DOMAIN as MEDIA_PLAYER_DOMAIN
-from homeassistant.const import ATTR_ENTITY_ID, ENTITY_MATCH_ALL, __version__ as HA_VERSION
+from homeassistant.components.media_player import DOMAIN as MEDIA_PLAYER_DOMAIN
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
+from homeassistant.const import ATTR_ENTITY_ID, ENTITY_MATCH_ALL
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
-from homeassistant.helpers import device_registry as dr, entity_registry as er, issue_registry as ir
+from homeassistant.helpers import entity_registry as er
 
-from .common import ISSUE_URL, error, key
-from .const import APPLE_TV_DOMAIN, DOMAIN, ISSUE_UNSUPPORTED_VERSION
+from .common import error, key
+from .const import APPLE_TV_DOMAIN, CONF_IDENTIFIERS, DOMAIN
+
+if TYPE_CHECKING:
+    from .connection import AppleTVConnection
 
 try:
     from homeassistant.helpers.target import TargetSelection, async_extract_referenced_entity_ids
@@ -28,8 +32,9 @@ _LOGGER = logging.getLogger(__name__)
 
 @dataclass
 class AppleTV:
-    """An Apple TV and its live connection."""
+    """A connected Apple TV."""
 
+    # How the Apple TV is named in responses and messages: the entity the call targeted, or its name.
     entity_id: str
     atv: Any
     # Ids (as key() forms) and names by which the Apple TV itself can appear in its own outputs.
@@ -41,89 +46,67 @@ class AppleTV:
         return key(device.identifier or "") in self.own_keys or (device.name or "").casefold() in self.own_names
 
 
-def get_apple_tv(hass: HomeAssistant, entity_id: str, *, log: bool = True) -> AppleTV:
-    """Return the Apple TV integration's live pyatv connection for a media player."""
-    entry = er.async_get(hass).async_get(entity_id)
-    if entry is None or entry.platform != APPLE_TV_DOMAIN or entry.domain != MEDIA_PLAYER_DOMAIN:
-        raise error(ServiceValidationError, "not_apple_tv", entity_id=entity_id)
+def is_device_entry(entry: ConfigEntry) -> bool:
+    """Return whether a config entry is a paired Apple TV (not an entry left over from version 1)."""
+    return bool(entry.data.get(CONF_IDENTIFIERS))
 
-    component = hass.data.get(DATA_COMPONENT)
-    entity = component.get_entity(entity_id) if component else None
-    config_entry = hass.config_entries.async_get_entry(entry.config_entry_id) if entry.config_entry_id else None
-    manager = getattr(config_entry, "runtime_data", None)
 
-    if (entity is not None or manager is not None) and not hasattr(entity, "atv") and not hasattr(manager, "atv"):
-        # This relies on internals of the Apple TV integration; say clearly when they have changed.
-        if log:
-            _LOGGER.error(
-                "The Apple TV integration in Home Assistant %s no longer exposes its pyatv connection "
-                "(%s has no 'atv' attribute), so %s cannot be controlled. Please report this at %s",
-                HA_VERSION,
-                type(entity if entity is not None else manager).__name__,
-                entity_id,
-                ISSUE_URL,
-            )
-        ir.async_create_issue(
-            hass,
-            DOMAIN,
-            ISSUE_UNSUPPORTED_VERSION,
-            is_fixable=False,
-            severity=ir.IssueSeverity.ERROR,
-            translation_key=ISSUE_UNSUPPORTED_VERSION,
-            translation_placeholders={"version": HA_VERSION, "url": ISSUE_URL},
-            learn_more_url=ISSUE_URL,
-        )
-        raise error(HomeAssistantError, "unsupported_version", version=HA_VERSION)
-    ir.async_delete_issue(hass, DOMAIN, ISSUE_UNSUPPORTED_VERSION)
+def connections(hass: HomeAssistant) -> list[AppleTVConnection]:
+    """Return the connections of the loaded Apple TV entries."""
+    return [
+        entry.runtime_data
+        for entry in hass.config_entries.async_entries(DOMAIN)
+        if is_device_entry(entry) and entry.state is ConfigEntryState.LOADED
+    ]
 
-    atv = getattr(entity, "atv", None) or getattr(manager, "atv", None)
-    if atv is None:
-        raise error(HomeAssistantError, "not_connected", entity_id=entity_id)
 
-    own_ids: list[str] = []
-    own_names: list[str] = []
-    if config_entry is not None:
-        own_ids += [config_entry.unique_id or "", *config_entry.data.get("identifiers", [])]
-        own_names += [config_entry.title, config_entry.data.get("name", "")]
-    device_info = getattr(atv, "device_info", None)
-    own_ids += [getattr(device_info, "output_device_id", None) or "", getattr(device_info, "mac", None) or ""]
+def connected(connection: AppleTVConnection, label: str | None = None) -> AppleTV:
+    """Return the Apple TV of a connection, or raise when it is not connected."""
+    label = label or connection.name
+    if connection.atv is None:
+        raise error(HomeAssistantError, "not_connected", entity_id=label)
+    device_info = getattr(connection.atv, "device_info", None)
+    own_ids = [getattr(device_info, "output_device_id", None) or "", getattr(device_info, "mac", None) or ""]
     return AppleTV(
-        entity_id,
-        atv,
-        frozenset(key(i) for i in own_ids if i),
-        frozenset(n.casefold() for n in own_names if n),
+        label,
+        connection.atv,
+        connection.identifiers | frozenset(key(i) for i in own_ids if i),
+        frozenset({connection.name.casefold()}),
     )
 
 
-def is_apple_tv_player(hass: HomeAssistant, entry: er.RegistryEntry | None) -> bool:
-    """Return whether a registry entry is the media player of an Apple TV (not of a HomePod)."""
-    if entry is None or entry.platform != APPLE_TV_DOMAIN or entry.domain != MEDIA_PLAYER_DOMAIN:
-        return False
-    device = dr.async_get(hass).async_get(entry.device_id) if entry.device_id else None
-    # Only a main device has a model; a child device (Home Assistant 2026.9 and newer) has none.
-    model = device.model if isinstance(device, dr.DeviceEntry) else None
-    return "homepod" not in (model or "").casefold()
+def connection_for_entity(hass: HomeAssistant, entity_id: str) -> AppleTVConnection | None:
+    """Return the Apple TV an entity belongs to.
 
-
-def apple_tv_players(hass: HomeAssistant) -> list[er.RegistryEntry]:
-    """Return the registry entries of every Apple TV media player, sorted by entity id."""
-    registry = er.async_get(hass)
-    return sorted(
-        (e for e in registry.entities.values() if is_apple_tv_player(hass, e) and not e.disabled),
-        key=lambda e: e.entity_id,
-    )
+    That is one of this integration's entities, or the Apple TV integration's media player of a paired
+    Apple TV, matched by the ids in the entity registry, so automations written for that media player
+    keep working.
+    """
+    registry_entry = er.async_get(hass).async_get(entity_id)
+    if registry_entry is None:
+        return None
+    for connection in connections(hass):
+        if registry_entry.platform == DOMAIN and registry_entry.config_entry_id == connection.entry.entry_id:
+            return connection
+        if (
+            registry_entry.platform == APPLE_TV_DOMAIN
+            and registry_entry.domain == MEDIA_PLAYER_DOMAIN
+            and key(registry_entry.unique_id) in connection.identifiers
+        ):
+            return connection
+    return None
 
 
 def targets(hass: HomeAssistant, call: ServiceCall) -> list[AppleTV]:
     """Return the Apple TVs a call targets.
 
-    An entity named directly must be a connected Apple TV. Of the entities an area, a device or
-    `all` brings in, the Apple TV media players are used, and those that cannot be are skipped.
+    An entity named directly must belong to a connected Apple TV. Of the entities an area, a device or
+    `all` brings in, those of Apple TVs are used, and those that cannot be are skipped.
     """
-    registry = er.async_get(hass)
     if call.data.get(ATTR_ENTITY_ID) == ENTITY_MATCH_ALL:
         direct: set[str] = set()
-        indirect = set(registry.entities)
+        indirect: set[str] = set()
+        everything = True
     else:
         if TargetSelection is not None:
             selected = async_extract_referenced_entity_ids(hass, TargetSelection(call.data))
@@ -131,17 +114,31 @@ def targets(hass: HomeAssistant, call: ServiceCall) -> list[AppleTV]:
             selected = _legacy_extract(hass, call)
         direct = set(selected.referenced)
         indirect = set(selected.indirectly_referenced) - direct
-    indirect = {entity_id for entity_id in indirect if is_apple_tv_player(hass, registry.async_get(entity_id))}
+        everything = False
 
     # Check every Apple TV before changing any, so a bad target cannot leave a half-done change.
-    apple_tvs = [get_apple_tv(hass, entity_id) for entity_id in sorted(direct)]
+    apple_tvs: dict[str, AppleTV] = {}
+    for entity_id in sorted(direct):
+        if (connection := connection_for_entity(hass, entity_id)) is None:
+            raise error(ServiceValidationError, "not_apple_tv", entity_id=entity_id)
+        apple_tvs.setdefault(connection.entry.entry_id, connected(connection, entity_id))
+
+    found: list[tuple[AppleTVConnection, str | None]] = []
+    if everything:
+        found = [(connection, None) for connection in connections(hass)]
+    # Media players first, so a response is keyed by the Apple TV's media player where there is one.
+    for entity_id in sorted(indirect, key=lambda e: (not e.startswith(f"{MEDIA_PLAYER_DOMAIN}."), e)):
+        if (connection := connection_for_entity(hass, entity_id)) is not None:
+            found.append((connection, entity_id if entity_id.startswith(f"{MEDIA_PLAYER_DOMAIN}.") else None))
     skipped: list[HomeAssistantError] = []
-    for entity_id in sorted(indirect):
+    for connection, label in found:
+        if connection.entry.entry_id in apple_tvs:
+            continue
         try:
-            apple_tvs.append(get_apple_tv(hass, entity_id))
+            apple_tvs[connection.entry.entry_id] = connected(connection, label)
         except HomeAssistantError as err:
-            _LOGGER.debug("Skipping %s: %s", entity_id, err)
+            _LOGGER.debug("Skipping %s: %s", connection.name, err)
             skipped.append(err)
     if not apple_tvs:
         raise skipped[0] if skipped else error(ServiceValidationError, "no_apple_tv")
-    return apple_tvs
+    return list(apple_tvs.values())

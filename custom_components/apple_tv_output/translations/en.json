@@ -2,33 +2,48 @@
   "config": {
     "step": {
       "user": {
-        "title": "Apple TV Audio Output",
-        "description": "Adds actions and entities that send an Apple TV's sound to AirPlay speakers. The Apple TV itself must be set up with the Apple TV integration. Afterwards, select Configure to choose speakers an Apple TV should always play to."
+        "title": "Add an Apple TV",
+        "description": "Choose the Apple TV to pair. Apple TV Audio Output connects to it itself, so it also works without the Apple TV integration.",
+        "data": {
+          "device": "Apple TV"
+        }
+      },
+      "pin": {
+        "title": "Pair {name}",
+        "description": "Type the PIN that {name} shows on the TV ({protocol}).",
+        "data": {
+          "pin": "PIN"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Pair {name} again",
+        "description": "{name} no longer accepts the pairing, for example after it was reset or the pairing was removed on the Apple TV. Make sure it is on, then continue to pair it again."
       }
     },
+    "error": {
+      "invalid_pin": "The PIN was not accepted. The Apple TV shows a new PIN; type that one."
+    },
     "abort": {
-      "single_instance_allowed": "Already configured. Only a single configuration is possible."
+      "already_configured": "This Apple TV is already set up.",
+      "no_devices_found": "No Apple TV that is not set up yet was found on the network. Make sure it is on and on the same network as Home Assistant.",
+      "cannot_connect": "Could not connect to the Apple TV to pair it. Make sure it is on and try again.",
+      "pairing_not_supported": "This Apple TV is too old to be paired by Apple TV Audio Output.",
+      "device_not_found": "The Apple TV was not found on the network. Make sure it is on and try again.",
+      "reauth_successful": "The Apple TV is paired again."
     }
   },
   "options": {
     "step": {
       "init": {
         "title": "Default speakers",
-        "description": "Choose an Apple TV. Its sound will be sent to the speakers you choose next whenever it wakes up.",
-        "data": {
-          "apple_tv": "Apple TV"
-        }
-      },
-      "speakers": {
-        "title": "Default speakers",
-        "description": "Choose the speakers, or type an AirPlay name or id. Leave it empty to stop sending this Apple TV's sound to default speakers.",
+        "description": "Choose the speakers {name} plays to whenever it wakes up, or type an AirPlay name or id. Leave it empty to stop sending its sound to default speakers.",
         "data": {
           "speakers": "Speakers"
         }
       }
     },
     "abort": {
-      "no_apple_tvs": "No Apple TV was found. Set up the Apple TV with the Apple TV integration first."
+      "legacy_entry": "This entry is left over from version 1 and does nothing. Add your Apple TVs with Add device, then delete this entry."
     }
   },
   "entity": {
@@ -137,16 +152,13 @@
   },
   "exceptions": {
     "no_apple_tv": {
-      "message": "The action did not target any Apple TV media player."
+      "message": "The action did not target any Apple TV paired with Apple TV Audio Output."
     },
     "not_apple_tv": {
-      "message": "{entity_id} is not an Apple TV media player."
+      "message": "{entity_id} is not an Apple TV paired with Apple TV Audio Output."
     },
     "not_connected": {
       "message": "{entity_id} is not connected."
-    },
-    "unsupported_version": {
-      "message": "The Apple TV integration in Home Assistant {version} works differently from what Apple TV Audio Output expects. Please report this as an issue."
     },
     "unknown_speaker_entity": {
       "message": "Unknown speaker entity {entity_id}."
@@ -171,9 +183,9 @@
     }
   },
   "issues": {
-    "unsupported_version": {
-      "title": "Apple TV Audio Output does not work with this Home Assistant version",
-      "description": "Home Assistant {version} changed the Apple TV integration in a way Apple TV Audio Output does not expect, so it cannot change the audio outputs. Please report this at {url}, and check for an update of Apple TV Audio Output in HACS."
+    "legacy_entry": {
+      "title": "Add your Apple TVs to Apple TV Audio Output again",
+      "description": "Apple TV Audio Output now pairs with each Apple TV itself instead of using the Apple TV integration's connection. Go to Settings → Devices & services → Apple TV Audio Output, select Add device, and pair each Apple TV; its default speakers are taken over. Then delete the old Apple TV Audio Output entry. Automations that target the Apple TV integration's media player keep working."
     }
   }
 }

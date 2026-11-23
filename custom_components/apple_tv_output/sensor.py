@@ -20,16 +20,16 @@ MAX_STATE = 255
 async def async_setup_entry(
     hass: HomeAssistant, entry: AppleTVOutputConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    async_add_entities(OutputsSensor(tracker, "outputs") for tracker in entry.runtime_data.trackers)
+    async_add_entities([OutputsSensor(entry.runtime_data, "outputs")])
 
 
 class OutputsSensor(AppleTVOutputEntity, SensorEntity):
-    """The names of the speakers the Apple TV plays to; the details are attributes."""
+    """The names of the outputs the Apple TV plays to; the details are attributes."""
 
     @callback
-    def _update_from_tracker(self) -> None:
-        outputs = self.tracker.outputs or []
+    def _update_from_connection(self) -> None:
+        outputs = self.outputs
         names = ", ".join(o["name"] for o in outputs if o.get("name"))
         self._attr_native_value = (names[: MAX_STATE - 1] + "…" if len(names) > MAX_STATE else names) or None
-        attributes: dict[str, Any] = {"outputs": outputs, "speakers": self.tracker.speaker_names}
+        attributes: dict[str, Any] = {"outputs": outputs, "speakers": self.speaker_names}
         self._attr_extra_state_attributes = attributes

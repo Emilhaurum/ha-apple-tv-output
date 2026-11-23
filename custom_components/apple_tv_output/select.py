@@ -8,7 +8,7 @@ from homeassistant.components.select import SelectEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .apple_tv import get_apple_tv
+from .apple_tv import connected
 from .entity import AppleTVOutputEntity
 from .outputs import Mode, async_change
 from .speakers import async_add_listener, async_resolve, get_cache
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 async def async_setup_entry(
     hass: HomeAssistant, entry: AppleTVOutputConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    async_add_entities(OutputSelect(tracker, "output") for tracker in entry.runtime_data.trackers)
+    async_add_entities([OutputSelect(entry.runtime_data, "output")])
 
 
 class OutputSelect(AppleTVOutputEntity, SelectEntity):
@@ -35,14 +35,13 @@ class OutputSelect(AppleTVOutputEntity, SelectEntity):
         self.async_on_remove(async_add_listener(self.hass, self._handle_update))
 
     @callback
-    def _update_from_tracker(self) -> None:
-        current = self.tracker.speaker_names
-        names = {d.name for d in get_cache(self.tracker.hass).all()} | set(current)
+    def _update_from_connection(self) -> None:
+        current = self.speaker_names
+        names = {d.name for d in get_cache(self.connection.hass).all()} | set(current)
         self._attr_options = sorted(names, key=str.casefold)
         self._attr_current_option = current[0] if len(current) == 1 else None
 
     async def async_select_option(self, option: str) -> None:
-        tv = get_apple_tv(self.hass, self.tracker.entity_id)
+        tv = connected(self.connection)
         speakers = await async_resolve(self.hass, [option])
         await async_change(self.hass, tv, speakers, Mode.SET)
-        self.tracker.async_refresh()

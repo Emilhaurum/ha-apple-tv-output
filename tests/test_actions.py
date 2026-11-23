@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
-from types import SimpleNamespace
 from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
-from homeassistant.helpers import device_registry as dr, entity_registry as er, issue_registry as ir
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 import pytest
 
-from custom_components.apple_tv_output.const import DOMAIN, ISSUE_UNSUPPORTED_VERSION
-from custom_components.apple_tv_output.speakers import async_start_background_scans
+from custom_components.apple_tv_output.const import DOMAIN
+from custom_components.apple_tv_output.speakers import DATA_CACHE, get_cache
 
 from .conftest import ATV_ENTITY, HAS_VOLUME, FakeSpeaker, Network
 
@@ -24,25 +23,31 @@ def speakers(network: Network) -> None:
     network.add(LIVING, KITCHEN)
 
 
+def forget_speakers(hass: HomeAssistant) -> None:
+    """Forget what the scans found, as before the first scan."""
+    hass.data.pop(DATA_CACHE, None)
+
+
 async def call(hass: HomeAssistant, service: str, response: bool = False, **data: Any) -> Any:
     data.setdefault("entity_id", ATV_ENTITY)
     return await hass.services.async_call(DOMAIN, service, data, blocking=True, return_response=response)
 
 
 async def test_get_speakers(hass: HomeAssistant, atv: Any, network: Network) -> None:
+    scans = network.scans
     result = await hass.services.async_call(DOMAIN, "get_speakers", {}, blocking=True, return_response=True)
+    # The Apple TV is an AirPlay receiver too, so the scan finds it as well.
     assert result == {
         "speakers": [
             {"name": "Kitchen", "identifier": KITCHEN.airplay_id},
             {"name": "Living Room", "identifier": LIVING.airplay_id},
+            {"name": "Living Room TV", "identifier": "AA:BB:CC:DD:EE:FF"},
         ]
     }
-    assert network.scans == 1
-    # Uses the recent scan, unless asked to scan again.
-    await hass.services.async_call(DOMAIN, "get_speakers", {}, blocking=True, return_response=True)
-    assert network.scans == 1
+    # Uses the scan made at setup, unless asked to scan again.
+    assert network.scans == scans
     await hass.services.async_call(DOMAIN, "get_speakers", {"rescan": True}, blocking=True, return_response=True)
-    assert network.scans == 2
+    assert network.scans == scans + 1
 
 
 async def test_modify_returns_previous_and_new_outputs(hass: HomeAssistant, atv: Any) -> None:
@@ -125,43 +130,27 @@ def add_speaker_entity(hass: HomeAssistant, entity_id: str, name: str, mac: str 
 async def test_speaker_entity_by_address(hass: HomeAssistant, atv: Any, network: Network) -> None:
     """The entity's name differs from the AirPlay name; its MAC address is used, with no scan."""
     add_speaker_entity(hass, "media_player.kitchen_sonos", "Kitchen Sonos", KITCHEN.airplay_id.lower())
+    scans = network.scans
     await call(hass, "set_output", speakers=["media_player.kitchen_sonos"])
     assert atv.audio.calls == [("set", (KITCHEN.airplay_id,))]
-    assert network.scans == 0
+    assert network.scans == scans
 
 
 async def test_speaker_entity_address_falls_back_to_name(hass: HomeAssistant, atv: Any, network: Network) -> None:
-    """The registered address is not the AirPlay id: the entity's name is tried instead."""
+    """No scan knows the speaker yet, and its registered address is not the AirPlay id: the name is tried."""
+    forget_speakers(hass)
     add_speaker_entity(hass, "media_player.kitchen", "Kitchen", "AA:AA:AA:AA:AA:AA")
     await call(hass, "set_output", speakers=["media_player.kitchen"])
     assert atv.audio.calls == [("set", ("AA:AA:AA:AA:AA:AA",)), ("set", (KITCHEN.airplay_id,))]
     assert [d.name for d in atv.audio.output_devices] == ["Kitchen"]
 
 
-async def test_background_scans(hass: HomeAssistant, atv: Any, network: Network) -> None:
-    unsubscribe = async_start_background_scans(hass)
-    await hass.async_block_till_done()
-    assert network.scans == 1
-    # A call by name now needs no scan of its own.
+async def test_background_scan_at_setup(hass: HomeAssistant, atv: Any, network: Network) -> None:
+    """Setting up scans for speakers, so a call by name needs no scan of its own."""
+    assert get_cache(hass).scanned_at is not None
+    scans = network.scans
     await call(hass, "set_output", speakers=["Kitchen"])
-    assert network.scans == 1
-    unsubscribe()
-
-
-async def test_repairs_issue(hass: HomeAssistant, atv: Any, entity_component: dict[str, Any]) -> None:
-    entry = hass.config_entries.async_entries("apple_tv")[0]
-    entry.runtime_data = SimpleNamespace(connection=atv)
-    entity_component[ATV_ENTITY] = SimpleNamespace(connection=atv)
-    with pytest.raises(HomeAssistantError):
-        await call(hass, "get_outputs", response=True)
-    issues = ir.async_get(hass)
-    assert issues.async_get_issue(DOMAIN, ISSUE_UNSUPPORTED_VERSION) is not None
-
-    # Fixed by an update: the issue goes away on the next successful lookup.
-    entry.runtime_data = SimpleNamespace(atv=atv)
-    entity_component.clear()
-    await call(hass, "get_outputs", response=True)
-    assert issues.async_get_issue(DOMAIN, ISSUE_UNSUPPORTED_VERSION) is None
+    assert network.scans == scans
 
 
 async def test_speaker_entity_known_name_skips_wrong_address(hass: HomeAssistant, atv: Any, network: Network) -> None:

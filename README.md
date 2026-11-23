@@ -10,18 +10,18 @@ an Apple TV 4K and Sonos speakers on Home Assistant 2026.11.
 
 tvOS only remembers a HomePod as its default audio output. Any other AirPlay speaker has to be picked
 again by hand after the Apple TV has slept. Home Assistant's Apple TV integration cannot do it for
-you, because it has no way to choose the audio output. This integration can send the sound to your
-speakers every time the Apple TV wakes up, with no automation needed. It also adds actions, a sensor
-and a dropdown for the audio output.
+you, because it has no way to choose the audio output. This integration pairs with the Apple TV and
+can send the sound to your speakers every time it wakes up, with no automation needed. It also adds
+actions, a sensor and a dropdown for the audio output.
 
 ![The Set audio output action in Developer tools, sending an Apple TV's sound to a Sonos speaker](https://raw.githubusercontent.com/Emilhaurum/ha-apple-tv-output/main/docs/set-output-action.png)
 
 ## Requirements
 
 - Home Assistant 2025.1 or newer (tested on 2026.11).
-- The Apple TV set up with the built-in
-  [Apple TV integration](https://www.home-assistant.io/integrations/apple_tv/). This integration
-  reuses its connection and needs no pairing of its own.
+- The Apple TV on the same network as Home Assistant. This integration pairs with it itself; the
+  built-in [Apple TV integration](https://www.home-assistant.io/integrations/apple_tv/) is not needed,
+  but can stay set up alongside it.
 - The Apple TV must be able to reach the speaker over AirPlay. If you can pick the speaker by hand
   on the Apple TV, it will work. See [Troubleshooting](#troubleshooting) if you cannot.
 
@@ -46,8 +46,19 @@ configuration and restart Home Assistant.
 [![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=apple_tv_output)
 
 Select the button above, or go to **Settings → Devices & services → Add integration** and add
-**Apple TV Audio Output**. There is nothing to fill in; adding it creates the entities and makes the
-actions available.
+**Apple TV Audio Output**. Choose your Apple TV from the list, then type the PIN it shows on the TV.
+To add another Apple TV, select **Add device** on the integration's page and do the same.
+
+If the Apple TV is reset, or the pairing is removed on it (**Settings → Remotes and Devices** on the
+Apple TV), Home Assistant asks you to pair it again.
+
+### Upgrading from version 1
+
+Version 1 borrowed the Apple TV integration's connection; version 2 pairs with each Apple TV itself.
+After updating, a repair notice asks you to add your Apple TVs as described above. Each Apple TV's
+default speakers carry over when you add it. Then delete the old Apple TV Audio Output entry, the one
+without a device. Automations and scripts that target the Apple TV integration's media player keep
+working.
 
 The integration's icon shows in Home Assistant 2026.3 and newer, which can show icons that come with
 a custom integration.
@@ -55,23 +66,25 @@ a custom integration.
 ## Default speakers
 
 To always play an Apple TV through the same speakers, open **Apple TV Audio Output** under
-**Settings → Devices & services** and select **Configure**. Choose the Apple TV, then the speakers.
-You can pick speakers found on the network or type an AirPlay name or id.
+**Settings → Devices & services**, and select **Configure** next to the Apple TV. Choose the speakers:
+you can pick speakers found on the network or type an AirPlay name or id.
 
-Whenever that Apple TV wakes up (its media player goes from off to on), its sound goes to those
-speakers. The integration waits up to 30 seconds for Home Assistant's connection to the Apple TV, and
-tries again a few times if a speaker does not start playing at once. When you set or change the
-speakers of an Apple TV that is on, they are applied at once.
+Whenever that Apple TV wakes up, its sound goes to those speakers. The integration tries again a few
+times if a speaker does not start playing at once. When you set or change the speakers of an Apple TV
+that is on, they are applied at once.
+
+An Apple TV may drop the connection while it sleeps. Reconnecting to it switched on therefore also
+counts as waking up, when it was off before the connection was lost or the connection was gone for at
+least five minutes.
 
 If you pick another speaker by hand while the Apple TV is on, it is left alone until the Apple TV
 next wakes up. Restarting Home Assistant, reloading the integration, or a short loss of the
-connection to the Apple TV does not count as waking up. To stop, configure the Apple TV again and
-leave the speakers empty.
+connection does not count as waking up. To stop, configure the Apple TV again and leave the speakers
+empty.
 
 ## Entities
 
-Each Apple TV gets a device, named like the Apple TV and connected via its device, with two
-entities:
+Each paired Apple TV is a device with two entities:
 
 | Entity | What it does |
 | --- | --- |
@@ -80,9 +93,9 @@ entities:
 
 <img src="https://raw.githubusercontent.com/Emilhaurum/ha-apple-tv-output/main/docs/audio-output-entities.png" width="414" alt="The Audio output dropdown and the Audio outputs sensor on an Apple TV's device page">
 
-The entities update within a few seconds of a change, including changes made on the Apple TV itself.
-They are unavailable while Home Assistant is not connected to the Apple TV. A new Apple TV gets its
-entities as soon as it is added to the Apple TV integration.
+The entities update as soon as the Apple TV reports a change, including changes made on the Apple TV
+itself. They are unavailable while the Apple TV is not connected; the integration keeps trying to
+reconnect.
 
 ### Example: a dashboard button
 
@@ -104,10 +117,15 @@ The dropdown can also be added to a dashboard as it is, with an entities card.
 
 ## Actions
 
-Every action except `get_speakers` targets one or more Apple TVs. Pick their media player entities, a
-device, an area or `all`. Of the entities a device, an area or `all` brings in, only the media
-players of Apple TVs that are connected are used: other entities, HomePods and Apple TVs that are off
-are skipped. An entity picked by name must be a connected Apple TV.
+Every action except `get_speakers` targets one or more paired Apple TVs. Pick this integration's
+entities or devices, the Apple TV integration's media player of a paired Apple TV, an area or `all`.
+Of the entities an area, a device or `all` brings in, only those of paired Apple TVs that are
+connected are used; others are skipped. An entity picked by name must belong to a connected, paired
+Apple TV.
+
+The examples below target the Apple TV integration's media player (`media_player.apple_tv`). Without
+that integration, target this integration's entity instead, such as
+`select.living_room_tv_audio_output`.
 
 | Action | What it does |
 | --- | --- |
@@ -238,9 +256,16 @@ different networks (VLANs) with a firewall between them. AirPlay 2 needs traffic
 between the two devices. Put them on the same network, or allow all traffic both ways between them.
 Picking the speaker by hand on the Apple TV fails in the same way until this is fixed.
 
-**"… is not connected".** Home Assistant has no connection to the Apple TV. Check that the Apple TV
-integration shows the device as available. Home Assistant must be able to reach the Apple TV on the
-network.
+**"… is not connected".** The integration has no connection to the Apple TV right now. It keeps
+trying in the background. Check that the Apple TV is on and that Home Assistant can reach it on the
+network; the debug log shows each attempt.
+
+**Home Assistant asks to pair the Apple TV again.** The Apple TV no longer accepts the pairing, for
+example after a reset or after the pairing was removed under **Settings → Remotes and Devices** on the
+Apple TV. Select **Reconfigure** on the notice and type the new PIN.
+
+**The Apple TV is not in the list when adding it.** It must be on and on the same network as Home
+Assistant (mDNS). HomePods and Apple TVs that are already added are not listed.
 
 **"No AirPlay speaker named … was found".** The error lists the names that were found, as does
 `get_speakers`. Use one of those, or use the speaker's AirPlay id. Home Assistant must be able to
@@ -253,29 +278,28 @@ AirPlay ids: use the id of the one you mean, or rename one of the speakers.
 was sent, but the Apple TV did not start playing to the speaker. This is usually the network problem
 described above. Right after the Apple TV wakes up it can also be too early; `retries` helps then.
 
-**A repair notice says the integration does not work with this Home Assistant version.** A Home
-Assistant update has changed the Apple TV integration's internals (see below). Please open an issue
-and say which Home Assistant version you run.
-
 To see what the integration does, turn on debug logging for it on its page under **Settings →
 Devices & services**. The log then shows the speakers each scan finds and the outputs after each
 change. When you report a problem, please attach the diagnostics: on the same page, open the menu
-and select **Download diagnostics**. AirPlay ids are left out of the download.
+and select **Download diagnostics**. AirPlay ids, addresses and pairing credentials are left out of
+the download.
 
 ## How it works
 
-The Apple TV integration is built on [pyatv](https://pyatv.dev), which can change the output
-devices of an Apple TV but is not exposed in Home Assistant. This integration looks up the pyatv
-connection that the Apple TV integration already holds and uses it. The entities read the outputs
-from that connection every two seconds, which causes no network traffic. It relies on internals of
-the Apple TV integration, so a future Home Assistant release could break it; please open an issue if
-it does.
+The integration uses [pyatv](https://pyatv.dev), the library behind Home Assistant's Apple TV
+integration, which can change an Apple TV's output devices. When you add an Apple TV, it pairs with
+it over AirPlay (and, on older tvOS, the remote control protocol) and stores the credentials. It
+then keeps its own connection to the Apple TV, reconnecting when it is lost, and the Apple TV reports
+changes to the outputs and its power state over it. An Apple TV accepts several paired controllers at
+once, as with several iPhones, so the Apple TV integration and the Remote app should keep working
+alongside it.
 
 ## Known limitations
 
-- It relies on internals of Home Assistant's Apple TV integration (see above). The tests are run
-  against the oldest supported and the newest Home Assistant release every day, but a new release
-  can still break it.
+- Pairing needs a PIN shown on the TV, so very old Apple TVs that ask for a PIN to be typed on them
+  are not supported.
+- Whether an Apple TV keeps the connection while it sleeps differs; the integration treats a
+  reconnect after a sleep or a long outage as waking up (see [Default speakers](#default-speakers)).
 - Speaker names need mDNS discovery from Home Assistant. Where that does not work, use AirPlay ids.
 - Two speakers with the same name cannot be told apart by name; use their ids.
 - The Apple TV itself can show up in its own list of outputs. It is ignored when `set_output`

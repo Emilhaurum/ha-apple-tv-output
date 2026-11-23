@@ -1,5 +1,33 @@
 # Changelog
 
+## [2.0.0]
+
+### Changed
+
+- **Each Apple TV is now paired with Apple TV Audio Output itself** and has its own connection,
+  instead of borrowing the connection of Home Assistant's Apple TV integration. That integration is no
+  longer needed, and Home Assistant updates to it can no longer break this one. Add each Apple TV with
+  **Add device** and type the PIN it shows.
+- Default speakers are set per Apple TV, with **Configure** next to it.
+- The entities update as soon as the Apple TV reports a change, instead of every two seconds.
+- Waking up is detected from the Apple TV's own power state. A reconnect after a sleep or a long
+  outage also counts as waking up, as an Apple TV may drop the connection while it sleeps.
+
+### Upgrading
+
+- After updating, a repair notice asks you to add your Apple TVs. Their default speakers carry over.
+  Then delete the old entry. Automations that target the Apple TV integration's media player keep
+  working.
+
+### Added
+
+- Home Assistant asks to pair an Apple TV again when it no longer accepts the pairing.
+- Diagnostics include the connection and power state; addresses and pairing credentials are redacted.
+
+### Removed
+
+- The repair notice about unsupported Home Assistant versions, which is no longer needed.
+
 ## [1.2.2]
 
 ### Documentation

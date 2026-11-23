@@ -1,40 +1,34 @@
 """Send an Apple TV's sound to AirPlay speakers.
 
-The core Apple TV integration does not expose pyatv's output-device control. This integration adds
-actions and entities for it, reusing the connection the Apple TV integration already holds.
+Each paired Apple TV is a config entry with its own pyatv connection. The actions and entities change
+the Apple TV's audio outputs through that connection.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from dataclasses import dataclass, field
-from typing import Any
+from collections.abc import Callable
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
-from homeassistant.core import Event, HomeAssistant, callback
-from homeassistant.helpers import config_validation as cv, entity_registry as er
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import config_validation as cv, issue_registry as ir
 from homeassistant.helpers.typing import ConfigType
+from homeassistant.util.hass_dict import HassKey
 
-from .apple_tv import apple_tv_players, is_apple_tv_player
-from .const import DOMAIN
+from .apple_tv import is_device_entry
+from .connection import AppleTVConnection
+from .const import DOMAIN, ISSUE_LEGACY_ENTRY
 from .defaults import async_setup_defaults
 from .services import async_setup_services
 from .speakers import async_start_background_scans
-from .tracker import OutputTracker
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 PLATFORMS = [Platform.SELECT, Platform.SENSOR]
 
+type AppleTVOutputConfigEntry = ConfigEntry[AppleTVConnection]
 
-@dataclass
-class RuntimeData:
-    """What the config entry holds while it is loaded."""
-
-    trackers: list[OutputTracker] = field(default_factory=list)
-
-
-type AppleTVOutputConfigEntry = ConfigEntry[RuntimeData]
+# The background scans for speakers run while any Apple TV is set up: (number of entries, stop function).
+DATA_SCANS: HassKey[tuple[int, Callable[[], None]]] = HassKey(f"{DOMAIN}_scans")
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -44,49 +38,67 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: AppleTVOutputConfigEntry) -> bool:
-    """Follow each Apple TV's outputs, scan for speakers, and apply the default speakers."""
-    trackers = [OutputTracker(hass, registry_entry) for registry_entry in apple_tv_players(hass)]
-    entry.runtime_data = RuntimeData(trackers)
-    for tracker in trackers:
-        entry.async_on_unload(tracker.async_start())
-    entry.async_on_unload(async_start_background_scans(hass, entry))
-    entry.async_on_unload(async_setup_defaults(hass, entry))
-    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
+    """Connect to the Apple TV, and apply its default speakers when it wakes up."""
+    if not is_device_entry(entry):
+        # Version 1 had a single entry that borrowed the Apple TV integration's connection. It does
+        # nothing now; the repair notice asks to add each Apple TV.
+        ir.async_create_issue(
+            hass,
+            DOMAIN,
+            ISSUE_LEGACY_ENTRY,
+            is_fixable=False,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key=ISSUE_LEGACY_ENTRY,
+        )
+        return True
 
-    tracked = {t.entity_id for t in trackers}
+    connection = AppleTVConnection(hass, entry)
+    entry.runtime_data = connection
+    _start_scans(hass, entry)
+    entry.async_on_unload(async_setup_defaults(hass, connection))
+    options = dict(entry.options)
 
-    @callback
-    def affects_apple_tvs(event_data: er.EventEntityRegistryUpdatedData) -> bool:
-        """Return whether an Apple TV was added, removed, renamed, enabled or disabled."""
-        action = event_data["action"]
-        if action == "update":
-            changes: Mapping[str, Any] = event_data.get("changes") or {}  # type: ignore[assignment]
-            if "entity_id" not in changes and "disabled_by" not in changes:
-                return False
-        if event_data["entity_id"] in tracked:
-            return True
-        if action == "remove":
-            return False
-        registry_entry = er.async_get(hass).async_get(event_data["entity_id"])
-        return is_apple_tv_player(hass, registry_entry) and not registry_entry.disabled  # type: ignore[union-attr]
+    async def entry_updated(hass: HomeAssistant, entry: AppleTVOutputConfigEntry) -> None:
+        # The connection also updates the entry when the Apple TV's address changes; only new options
+        # (default speakers) need a new setup.
+        if dict(entry.options) != options:
+            hass.config_entries.async_schedule_reload(entry.entry_id)
 
-    @callback
-    def registry_updated(_event: Event[er.EventEntityRegistryUpdatedData]) -> None:
-        # Set up again, so the entities and the default speakers follow.
-        hass.config_entries.async_schedule_reload(entry.entry_id)
-
-    entry.async_on_unload(
-        hass.bus.async_listen(er.EVENT_ENTITY_REGISTRY_UPDATED, registry_updated, event_filter=affects_apple_tvs)
-    )
+    entry.async_on_unload(entry.add_update_listener(entry_updated))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    connection.async_start()
     return True
 
 
-async def _async_options_updated(hass: HomeAssistant, entry: AppleTVOutputConfigEntry) -> None:
-    """Set up again with the new default speakers."""
-    hass.config_entries.async_schedule_reload(entry.entry_id)
+def _start_scans(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    count, stop = hass.data.get(DATA_SCANS, (0, lambda: None))
+    if count == 0:
+        stop = async_start_background_scans(hass, entry)
+    hass.data[DATA_SCANS] = (count + 1, stop)
+
+    def release() -> None:
+        count, stop = hass.data.pop(DATA_SCANS, (1, lambda: None))
+        if count <= 1:
+            stop()
+        else:
+            hass.data[DATA_SCANS] = (count - 1, stop)
+
+    entry.async_on_unload(release)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: AppleTVOutputConfigEntry) -> bool:
-    """Unload the entry."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    """Unload the entry, and close the connection."""
+    if not is_device_entry(entry):
+        return True
+    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unloaded:
+        await entry.runtime_data.async_stop()
+    return unloaded
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Remove the repair notice with the last entry left over from version 1."""
+    if not is_device_entry(entry) and not any(
+        not is_device_entry(e) for e in hass.config_entries.async_entries(DOMAIN) if e.entry_id != entry.entry_id
+    ):
+        ir.async_delete_issue(hass, DOMAIN, ISSUE_LEGACY_ENTRY)

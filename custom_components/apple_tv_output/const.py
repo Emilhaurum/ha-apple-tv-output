@@ -18,10 +18,16 @@ SERVICE_GET_OUTPUTS = "get_outputs"
 SERVICE_GET_SPEAKERS = "get_speakers"
 SERVICE_SET_VOLUME = "set_volume"
 
-# Options: default speakers per Apple TV, by the entity registry id of its media player.
+# Config entry data of a paired Apple TV.
+CONF_ADDRESS = "address"
+CONF_IDENTIFIERS = "identifiers"
+CONF_CREDENTIALS = "credentials"
+
+# Options: the Apple TV's default speakers. (A 1.x entry stored them by the registry id of the Apple TV
+# integration's media player instead.)
 CONF_DEFAULT_SPEAKERS = "default_speakers"
 
-ISSUE_UNSUPPORTED_VERSION = "unsupported_version"
+ISSUE_LEGACY_ENTRY = "legacy_entry"
 
 # How long a network scan for AirPlay speakers may take, in seconds.
 SCAN_TIMEOUT = 4
@@ -36,9 +42,13 @@ OUTPUT_SETTLE_TIME = 2.0
 RETRY_DELAY = 3.0
 MAX_RETRIES = 5
 
-# How often the entities read the outputs from the connection (no network traffic), in seconds.
-POLL_INTERVAL = 2
-
-# Default speakers: how many times a woken Apple TV is retried, and how long to wait for its connection.
+# Default speakers: how many times the command is sent again when a speaker does not start playing.
 DEFAULT_SPEAKERS_RETRIES = 3
-CONNECT_WAIT = 30
+
+# Reconnecting to an Apple TV: the first and the longest wait between attempts, in seconds.
+RECONNECT_MIN = 5
+RECONNECT_MAX = 300
+
+# An Apple TV may drop the connection while it sleeps. Reconnecting to one that is on counts as waking
+# up when it was off before the connection was lost, or when the connection was gone this long (seconds).
+WAKE_AFTER_OUTAGE = 300

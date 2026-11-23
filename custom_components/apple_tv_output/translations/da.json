@@ -2,33 +2,48 @@
   "config": {
     "step": {
       "user": {
-        "title": "Apple TV Audio Output",
-        "description": "Tilføjer handlinger og entiteter, der sender lyden fra et Apple TV til AirPlay-højttalere. Selve Apple TV'et skal være sat op med Apple TV-integrationen. Vælg bagefter Konfigurer for at vælge de højttalere, et Apple TV altid skal spille på."
+        "title": "Tilføj et Apple TV",
+        "description": "Vælg det Apple TV, der skal parres. Apple TV Audio Output forbinder selv til det, så det også virker uden Apple TV-integrationen.",
+        "data": {
+          "device": "Apple TV"
+        }
+      },
+      "pin": {
+        "title": "Par {name}",
+        "description": "Skriv den pinkode, som {name} viser på tv'et ({protocol}).",
+        "data": {
+          "pin": "Pinkode"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Par {name} igen",
+        "description": "{name} accepterer ikke længere parringen, for eksempel efter en nulstilling, eller hvis parringen er fjernet på Apple TV'et. Sørg for, at det er tændt, og fortsæt for at parre det igen."
       }
     },
+    "error": {
+      "invalid_pin": "Pinkoden blev ikke accepteret. Apple TV'et viser en ny pinkode; skriv den."
+    },
     "abort": {
-      "single_instance_allowed": "Allerede konfigureret. Der kan kun være én konfiguration."
+      "already_configured": "Dette Apple TV er allerede sat op.",
+      "no_devices_found": "Der blev ikke fundet noget Apple TV på netværket, som ikke allerede er sat op. Sørg for, at det er tændt og på samme netværk som Home Assistant.",
+      "cannot_connect": "Kunne ikke forbinde til Apple TV'et for at parre det. Sørg for, at det er tændt, og prøv igen.",
+      "pairing_not_supported": "Dette Apple TV er for gammelt til at kunne parres af Apple TV Audio Output.",
+      "device_not_found": "Apple TV'et blev ikke fundet på netværket. Sørg for, at det er tændt, og prøv igen.",
+      "reauth_successful": "Apple TV'et er parret igen."
     }
   },
   "options": {
     "step": {
       "init": {
         "title": "Standardhøjttalere",
-        "description": "Vælg et Apple TV. Lyden sendes til de højttalere, du vælger i næste trin, hver gang det vågner.",
-        "data": {
-          "apple_tv": "Apple TV"
-        }
-      },
-      "speakers": {
-        "title": "Standardhøjttalere",
-        "description": "Vælg højttalerne, eller skriv et AirPlay-navn eller -id. Lad feltet være tomt for at holde op med at sende dette Apple TV's lyd til standardhøjttalere.",
+        "description": "Vælg de højttalere, {name} spiller på, hver gang det vågner, eller skriv et AirPlay-navn eller -id. Lad feltet være tomt for at holde op med at sende lyden til standardhøjttalere.",
         "data": {
           "speakers": "Højttalere"
         }
       }
     },
     "abort": {
-      "no_apple_tvs": "Der blev ikke fundet noget Apple TV. Sæt først Apple TV'et op med Apple TV-integrationen."
+      "legacy_entry": "Denne post er tilbage fra version 1 og gør intet. Tilføj dine Apple TV'er med Tilføj enhed, og slet derefter denne post."
     }
   },
   "entity": {
@@ -137,16 +152,13 @@
   },
   "exceptions": {
     "no_apple_tv": {
-      "message": "Handlingen var ikke rettet mod nogen Apple TV-medieafspiller."
+      "message": "Handlingen var ikke rettet mod noget Apple TV, der er parret med Apple TV Audio Output."
     },
     "not_apple_tv": {
-      "message": "{entity_id} er ikke en Apple TV-medieafspiller."
+      "message": "{entity_id} er ikke et Apple TV, der er parret med Apple TV Audio Output."
     },
     "not_connected": {
       "message": "{entity_id} er ikke forbundet."
-    },
-    "unsupported_version": {
-      "message": "Apple TV-integrationen i Home Assistant {version} fungerer anderledes, end Apple TV Audio Output forventer. Rapportér det venligst som et problem."
     },
     "unknown_speaker_entity": {
       "message": "Ukendt højttalerentitet {entity_id}."
@@ -171,9 +183,9 @@
     }
   },
   "issues": {
-    "unsupported_version": {
-      "title": "Apple TV Audio Output virker ikke med denne version af Home Assistant",
-      "description": "Home Assistant {version} har ændret Apple TV-integrationen på en måde, som Apple TV Audio Output ikke forventer, så den kan ikke ændre lydudgangene. Rapportér det venligst på {url}, og se efter en opdatering af Apple TV Audio Output i HACS."
+    "legacy_entry": {
+      "title": "Tilføj dine Apple TV'er til Apple TV Audio Output igen",
+      "description": "Apple TV Audio Output parrer nu selv med hvert Apple TV i stedet for at bruge Apple TV-integrationens forbindelse. Gå til Indstillinger → Enheder og tjenester → Apple TV Audio Output, vælg Tilføj enhed, og par hvert Apple TV; dets standardhøjttalere overtages. Slet derefter den gamle post for Apple TV Audio Output. Automatiseringer, der er rettet mod Apple TV-integrationens medieafspiller, virker fortsat."
     }
   }
 }

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from types import SimpleNamespace
 from typing import Any
 from unittest.mock import patch
 
@@ -14,8 +13,9 @@ import pytest
 
 from custom_components.apple_tv_output import speakers as speakers_module
 from custom_components.apple_tv_output.const import CACHE_TTL, DOMAIN
+from custom_components.apple_tv_output.speakers import DATA_CACHE
 
-from .conftest import ATV_AIRPLAY_ID, ATV_ENTITY, ATV_NAME, FakeSpeaker, Network, add_apple_tv
+from .conftest import ATV_AIRPLAY_ID, ATV_ENTITY, ATV_NAME, FakeSpeaker, Network, add_apple_tv, setup_entry
 
 LIVING = FakeSpeaker("Living Room", "34:7E:5C:D6:4E:1E")
 KITCHEN = FakeSpeaker("Kitchen", "48:A6:B8:00:00:01")
@@ -32,6 +32,13 @@ async def call(hass: HomeAssistant, service: str, **data: Any) -> Any:
 @pytest.fixture(autouse=True)
 def speakers(network: Network) -> None:
     network.add(LIVING, KITCHEN, HOMEPOD)
+
+
+@pytest.fixture(autouse=True)
+def no_speakers_found_yet(hass: HomeAssistant, atv: Any, network: Network) -> None:
+    """Start these tests as if no scan for speakers had been made yet."""
+    hass.data.pop(DATA_CACHE, None)
+    network.scans = 0
 
 
 async def test_set_output_by_name(hass: HomeAssistant, atv: Any) -> None:
@@ -121,7 +128,8 @@ async def test_speaker_not_found(hass: HomeAssistant, atv: Any) -> None:
     with pytest.raises(ServiceValidationError) as err:
         await call(hass, "set_output", speakers=["Garage"])
     assert err.value.translation_key == "speaker_not_found"
-    assert err.value.translation_placeholders["found"] == "Bedroom, Kitchen, Living Room"
+    # The Apple TV is an AirPlay receiver too, so the scan finds it as well.
+    assert err.value.translation_placeholders["found"] == "Bedroom, Kitchen, Living Room, Living Room TV"
 
 
 async def test_speaker_ambiguous(hass: HomeAssistant, atv: Any, network: Network) -> None:
@@ -195,31 +203,25 @@ async def test_not_an_apple_tv(hass: HomeAssistant, atv: Any, network: Network) 
 
 
 async def test_not_connected(hass: HomeAssistant, atv: Any) -> None:
-    entry = hass.config_entries.async_entries("apple_tv")[0]
-    entry.runtime_data = SimpleNamespace(atv=None)
+    """The Apple TV has gone from the network; the connection keeps trying in the background."""
+    atv.online = False
+    atv.lose_connection()
+    await hass.async_block_till_done()
     with pytest.raises(HomeAssistantError) as err:
         await call(hass, "get_outputs")
     assert err.value.translation_key == "not_connected"
 
 
-async def test_connection_from_entity(hass: HomeAssistant, atv: Any, entity_component: dict[str, Any]) -> None:
-    entry = hass.config_entries.async_entries("apple_tv")[0]
-    entry.runtime_data = SimpleNamespace(atv=None)
-    entity_component[ATV_ENTITY] = SimpleNamespace(atv=atv)
-    await call(hass, "set_output", speakers=[LIVING.airplay_id])
+async def test_target_own_entities_and_device(hass: HomeAssistant, atv: Any) -> None:
+    """The Apple TV can also be targeted by this integration's entities or its device."""
+    await call(hass, "set_output", entity_id="select.living_room_tv_audio_output", speakers=[LIVING.airplay_id])
     assert atv.audio.calls == [("set", (LIVING.airplay_id,))]
-
-
-async def test_internals_changed(
-    hass: HomeAssistant, atv: Any, entity_component: dict[str, Any], caplog: pytest.LogCaptureFixture
-) -> None:
-    entry = hass.config_entries.async_entries("apple_tv")[0]
-    entry.runtime_data = SimpleNamespace(connection=atv)
-    entity_component[ATV_ENTITY] = SimpleNamespace(connection=atv)
-    with pytest.raises(HomeAssistantError) as err:
-        await call(hass, "get_outputs")
-    assert err.value.translation_key == "unsupported_version"
-    assert "no longer exposes its pyatv connection" in caplog.text
+    entry = hass.config_entries.async_entries(DOMAIN)[0]
+    (device,) = dr.async_entries_for_config_entry(dr.async_get(hass), entry.entry_id)
+    await hass.services.async_call(
+        DOMAIN, "set_output", {"device_id": device.id, "speakers": [KITCHEN.airplay_id]}, blocking=True
+    )
+    assert atv.audio.calls[-1] == ("set", (KITCHEN.airplay_id,))
 
 
 async def test_target_device_keeps_only_apple_tvs(hass: HomeAssistant, atv: Any, network: Network) -> None:
@@ -238,12 +240,15 @@ async def test_target_device_keeps_only_apple_tvs(hass: HomeAssistant, atv: Any,
 
 
 async def test_several_apple_tvs(hass: HomeAssistant, atv: Any, network: Network) -> None:
-    other, _ = add_apple_tv(
+    other, entry = add_apple_tv(
         hass, network, "bedroom_tv", "Bedroom TV", "99999999-2222-3333-4444-555555555555", "AA:BB:CC:00:00:01"
     )
+    await setup_entry(hass, entry)
+    hass.data.pop(DATA_CACHE, None)
+    scans = network.scans
     await call(hass, "set_output", entity_id=[ATV_ENTITY, "media_player.bedroom_tv"], speakers=["Kitchen"])
     assert atv.audio.calls == other.audio.calls == [("set", (KITCHEN.airplay_id,))]
-    assert network.scans == 1
+    assert network.scans == scans + 1
 
 
 async def test_no_target(hass: HomeAssistant, atv: Any) -> None:
@@ -277,36 +282,36 @@ async def test_entity_id_all(hass: HomeAssistant, atv: Any, network: Network) ->
     other, entry = add_apple_tv(
         hass, network, "bedroom_tv", "Bedroom TV", "99999999-2222-3333-4444-555555555555", "AA:BB:CC:00:00:01"
     )
-    entry.runtime_data = SimpleNamespace(atv=None)  # not connected: skipped
+    other.online = False  # not connected: skipped
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
     await call(hass, "set_output", entity_id="all", speakers=["Kitchen"])
     assert atv.audio.calls == [("set", (KITCHEN.airplay_id,))]
     assert other.audio.calls == []
 
 
 async def test_area_skips_homepods_and_unconnected(hass: HomeAssistant, atv: Any, network: Network) -> None:
-    """An area brings in a HomePod's media player and an Apple TV that is off: both are skipped."""
+    """An area brings in a HomePod's media player (not paired here) and an Apple TV that is off: both
+    are skipped."""
     area = "living_room"
     devices, entities = dr.async_get(hass), er.async_get(hass)
-    homepod, homepod_entry = add_apple_tv(
-        hass, network, "homepod", "HomePod", "88888888-2222-3333-4444-555555555555", "AA:BB:CC:00:00:02"
+    apple_tv_entry = hass.config_entries.async_entries("apple_tv")[0]
+    homepod = entities.async_get_or_create(
+        "media_player", "apple_tv", "88888888-2222-3333-4444-555555555555", config_entry=apple_tv_entry
     )
     off, off_entry = add_apple_tv(
         hass, network, "den_tv", "Den TV", "77777777-2222-3333-4444-555555555555", "AA:BB:CC:00:00:03"
     )
-    off_entry.runtime_data = SimpleNamespace(atv=None)
-    for entity_id, entry, model in [
-        (ATV_ENTITY, hass.config_entries.async_entries("apple_tv")[0], "Apple TV 4K"),
-        ("media_player.homepod", homepod_entry, "HomePod Mini"),
-        ("media_player.den_tv", off_entry, "Apple TV 4K"),
-    ]:
-        device = devices.async_get_or_create(
-            config_entry_id=entry.entry_id, identifiers={("apple_tv", entity_id)}, model=model
-        )
+    off.online = False
+    assert await hass.config_entries.async_setup(off_entry.entry_id)
+    await hass.async_block_till_done()
+    for entity_id in (ATV_ENTITY, homepod.entity_id, "media_player.den_tv"):
+        device = devices.async_get_or_create(config_entry_id=apple_tv_entry.entry_id, identifiers={("x", entity_id)})
         devices.async_update_device(device.id, area_id=area)
         entities.async_update_entity(entity_id, device_id=device.id)
     await hass.services.async_call(DOMAIN, "set_output", {"area_id": area, "speakers": ["Kitchen"]}, blocking=True)
     assert atv.audio.calls == [("set", (KITCHEN.airplay_id,))]
-    assert homepod.audio.calls == off.audio.calls == []
+    assert off.audio.calls == []
 
 
 async def test_scan_keeps_speakers_that_miss_a_scan(hass: HomeAssistant, atv: Any, network: Network) -> None:
@@ -371,3 +376,19 @@ async def test_concurrent_calls_share_one_scan(hass: HomeAssistant, atv: Any, ne
         call(hass, "add_output", speakers=["Living Room"]),
     )
     assert network.scans == 1
+
+
+async def test_response_keyed_by_media_player_in_area(hass: HomeAssistant, atv: Any) -> None:
+    """An area brings in the Apple TV's media player and this integration's entities: one change,
+    keyed by the media player."""
+    area = "living_room"
+    devices, entities = dr.async_get(hass), er.async_get(hass)
+    entry = hass.config_entries.async_entries(DOMAIN)[0]
+    (own_device,) = dr.async_entries_for_config_entry(devices, entry.entry_id)
+    devices.async_update_device(own_device.id, area_id=area)
+    devices.async_update_device(entities.async_get(ATV_ENTITY).device_id, area_id=area)
+    result = await hass.services.async_call(
+        DOMAIN, "set_output", {"area_id": area, "speakers": ["Kitchen"]}, blocking=True, return_response=True
+    )
+    assert list(result) == [ATV_ENTITY]
+    assert atv.audio.calls == [("set", (KITCHEN.airplay_id,))]
